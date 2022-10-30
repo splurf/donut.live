@@ -1,12 +1,11 @@
-use std::{env::args, net::ToSocketAddrs};
-
 mod donut;
 
 use {
     donut::*,
     std::{
+        env::args,
         io::{Read, Result, Write},
-        net::{TcpListener, TcpStream},
+        net::{TcpListener, TcpStream, ToSocketAddrs},
         thread::{sleep, spawn},
         time::Duration,
     },
@@ -68,14 +67,12 @@ fn handle_stream(mut stream: TcpStream, frames: Vec<Vec<u8>>) -> Result<()> {
 fn main() -> Result<()> {
     //  retrieve specfied address or resort to `localhost`
     let addr = {
-        if let Some(arg) = args().nth(1) {
-            arg
-        } else {
-            "localhost:80".to_string()
-        }
-        .to_socket_addrs()?
-        .find(|sa| sa.port() == 80)
-        .expect("Invalid Port (must use 80)")
+        args()
+            .nth(1)
+            .unwrap_or("localhost:80".to_string())
+            .to_socket_addrs()?
+            .find(|sa| sa.port() == 80)
+            .expect("Invalid Port (must use 80)")
     };
 
     //  initiate the listener
@@ -86,17 +83,11 @@ fn main() -> Result<()> {
 
     //  iterate through all incoming streams while verfying in the progress
     for stream in server.incoming().filter_map(verify_stream) {
-        println!("{:?}", stream);
-
         //  the designated cloned frames for the verifed stream
         let frames_thread = frames.clone();
 
         //  have another thread handle the verified stream
-        spawn(|| {
-            if let Err(e) = handle_stream(stream, frames_thread) {
-                println!("{}", e)
-            }
-        });
+        spawn(|| handle_stream(stream, frames_thread));
     }
     Ok(())
 }

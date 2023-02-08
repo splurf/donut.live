@@ -7,8 +7,8 @@ use {
         env::args,
         io::{Read, Result, Write},
         net::{IpAddr, TcpListener, TcpStream, ToSocketAddrs},
-        sync::{Arc, Mutex},
-        thread::{sleep, spawn},
+        sync::Mutex,
+        thread::{scope, sleep},
         time::Duration,
     },
 };
@@ -32,39 +32,37 @@ fn verify_stream(stream: Result<TcpStream>) -> Option<(IpAddr, TcpStream)> {
     let mut stream = stream.ok()?;
     let addr = stream.peer_addr().ok()?;
 
-    let mut buf = [0; 96];
+    let mut buf = [0; 128];
     let bytes = stream.read(&mut buf).ok()?;
     let curl = String::from_utf8_lossy(&buf[..bytes]);
-    let parts = curl
+
+    //  retrieve the necessary headers
+    if let [premise, .., user_agent, accept] = curl
         .split("\r\n")
         .filter(|p| !p.is_empty())
-        .collect::<Vec<&str>>();
-
-    (parts.len() == 4
-        && {
-            let (request, http) = parts[0].split_once(" / ")?;
-            request == "GET" && {
-                let (http, version) = http.split_once("/")?;
-                http == "HTTP" && version == "1.1"
-            }
-        }
-        && parts[2].split_once(" ")?.1.split_once("/")?.0 == "curl"
-        && parts[3].split_once(" ")?.1 == "*/*")
-        .then(|| (addr.ip(), stream))
+        .collect::<Vec<_>>()[..]
+    {
+        //  verify those headers
+        (premise == "GET / HTTP/1.1"
+            && user_agent.starts_with("User-Agent: curl/")
+            && accept == "Accept: */*")
+            .then_some((addr.ip(), stream))
+    } else {
+        None
+    }
 }
 
 /**
  * Continuously send each frame to the stream
  */
-fn handle_stream(mut stream: TcpStream, frames: Vec<Vec<u8>>) -> Result<()> {
+fn handle_stream(mut stream: impl Write, frames: &[Vec<u8>]) -> Result<()> {
     stream.write_all(HEADER)?;
 
-    loop {
-        for frame in frames.iter() {
-            stream.write_all(frame)?;
-            sleep(DELAY);
-        }
+    for frame in frames.iter().cycle() {
+        stream.write_all(frame)?;
+        sleep(DELAY);
     }
+    unreachable!("iterator is infinite")
 }
 
 fn main() -> Result<()> {
@@ -82,28 +80,25 @@ fn main() -> Result<()> {
     let server = TcpListener::bind(addr)?;
 
     //  generate the donuts
-    let frames = donuts();
+    let frames = &donuts();
 
     //  used to rate limit each stream to one session at a time
-    let streams = Arc::new(Mutex::new(HashSet::<IpAddr>::default()));
+    let streams: &Mutex<HashSet<IpAddr>> = &Default::default();
 
-    //  iterate through all incoming streams while verfying in the progress
-    for (addr, stream) in server.incoming().filter_map(verify_stream) {
-        //  insert the stream's address into `streams` then continue if it didn't previously exist
-        if streams.lock().unwrap().insert(addr) {
-            let streams_thread = streams.clone();
-
-            //  the designated cloned frames for the verifed stream
-            let frames_thread = frames.clone();
-
-            //  have another thread handle the verified stream
-            spawn(move || {
-                let result = handle_stream(stream, frames_thread);
-                //  remove stream`s address from `streams`
-                streams_thread.lock().unwrap().remove(&addr);
-                result
-            });
+    scope(|s| {
+        //  iterate through all incoming streams while verfying in the progress
+        for (ip, stream) in server.incoming().filter_map(verify_stream) {
+            //  insert the stream's address into `streams` then continue if it didn't previously exist
+            if streams.lock().unwrap().insert(ip) {
+                //  have another thread handle the verified stream
+                s.spawn(move || {
+                    //  this is ignored
+                    let _ = handle_stream(stream, frames);
+                    //  remove stream`s address from `streams`
+                    streams.lock().unwrap().remove(&ip);
+                });
+            }
         }
-    }
-    Ok(())
+        unreachable!("iterator is infinite")
+    })
 }

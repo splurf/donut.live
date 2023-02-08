@@ -1,3 +1,5 @@
+use std::f32::consts::TAU;
+
 /**
  * donut.c rewritten except it returns the *stdout* as a vector
  */
@@ -15,8 +17,8 @@ pub fn donuts() -> Vec<Vec<u8>> {
 
     (0..314)
         .map(|_| {
-            while j < 6.28 {
-                while i < 6.28 {
+            while j < TAU {
+                while i < TAU {
                     let c = f32::sin(i);
                     let d = f32::cos(j);
                     let e = f32::sin(a);
@@ -50,7 +52,7 @@ pub fn donuts() -> Vec<Vec<u8>> {
             let frames = format!(
                 "\x1b[H{}",
                 p.chunks(80)
-                    .map(|l| l.iter().collect::<String>())
+                    .map(|l| l.iter().collect())
                     .collect::<Vec<String>>()
                     .join("\n")
             )

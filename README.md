@@ -2,10 +2,16 @@
 
 Similar to [parrot.live](https://github.com/hugomd/parrot.live), but here it is in donut form.
 
-## Usage
+## What does this do?
+Host it then `curl` it!
+```
+curl localhost:80
+```
+
+## Building and Usage
 + Build with `cargo` from [rustup](https://rustup.rs/) $\to$ `cargo build --release`
 + Run the executable from wherever `./donut-live`
-+ That's it. You can also specify an address like so: `./donut-live 127.0.0.1:80`
++ That's it. You can also specify an address like so: `./donut-live localhost:80`
 + If you don't specify an address, it will automatically default to *localhost:80*
 
 ## Description

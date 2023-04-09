@@ -1,6 +1,4 @@
-use std::f32::consts::TAU;
-
-const CHARACTERS: [char; 12] = ['.', ',', '-', '~', ':', ';', '=', '!', '*', '#', '$', '@'];
+use {super::constants::CHARACTERS, std::f32::consts::TAU};
 
 /**
  * Generate a single frame of the donut based on the given variables

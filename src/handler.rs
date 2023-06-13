@@ -1,46 +1,65 @@
 use {
     super::{
-        constants::{CLEAR, DELAY, GREED},
+        constants::{CLEAR, GREED},
         error::*,
     },
+    httparse::{Request, EMPTY_HEADER},
     std::{
-        io::Write,
-        net::{Shutdown, TcpStream},
-        sync::Mutex,
-        thread::sleep,
+        collections::HashMap,
+        io::{Read, Write},
+        net::{IpAddr, Shutdown, TcpStream},
     },
 };
 
-/** Continuously send each frame to the stream */
-pub fn handle_stream(
-    mut stream: impl Write,
-    frames: &[Box<[u8; 1784]>],
-    frame_index: &Mutex<usize>,
-) -> Result<()> {
-    stream.write_all(&CLEAR)?;
+/** Verify the potential stream by checking if the User-Agent's product is `curl` and a few other practicalities */
+fn verify_stream(mut stream: &TcpStream) -> Result<()> {
+    let mut buf = [0; 128];
+    _ = stream.read(&mut buf)?;
 
-    //  aquire the lock and hold it until the connection is lost
-    let mut frame_index_guard = frame_index.lock()?;
+    let mut headers = [EMPTY_HEADER; 8];
+    let mut req = Request::new(&mut headers);
+    _ = req.parse(&buf)?;
 
-    //  place the frames into a cycle then advance the iterator to the last visited frame
-    let mut frames_iter = frames.iter().enumerate().cycle();
-    frames_iter.nth(*frame_index_guard);
+    if let (Some(method), Some(path), Some(version)) = (req.method, req.path, req.version) {
+        let user_agent = headers
+            .iter()
+            .find_map(|h| (h.name == "User-Agent").then_some(h.value))
+            .ok_or("Invalid `User-Agent` header value")?;
+        let accept = headers
+            .iter()
+            .find_map(|h| (h.name == "Accept").then_some(h.value))
+            .ok_or("Invalid `Accept` header value")?;
 
-    for (i, frame) in frames_iter {
-        let result = stream.write_all(frame.as_slice());
-
-        //  if the stream loses connection, set the frame index to the index of the current frame
-        if result.is_err() {
-            *frame_index_guard = i;
-            result?
+        if method == "GET"
+            && path == "/"
+            && version == 1
+            && user_agent.starts_with(b"curl")
+            && accept == b"*/*"
+        {
+            Ok(())
+        } else {
+            Err("Invalid client properties".into())
         }
-        sleep(DELAY);
+    } else {
+        Err("Invalid client format".into())
     }
-    unreachable!("iterator is infinite")
 }
 
-/** Send the refused stream a goodbye message then shutdown the connection */
-pub fn close_stream(mut stream: TcpStream) -> Result<()> {
-    stream.write_all(&GREED)?;
-    stream.shutdown(Shutdown::Both).map_err(Into::into)
+pub fn handle_stream(
+    mut stream: TcpStream,
+    ip: IpAddr,
+    streams: &mut HashMap<IpAddr, TcpStream>,
+) -> Result<()> {
+    verify_stream(&stream)?;
+
+    if streams.contains_key(&ip) {
+        /* Send the refused stream a goodbye message then shutdown the connection */
+        stream.write_all(&GREED)?;
+        stream.shutdown(Shutdown::Both).map_err(Into::into)
+    } else {
+        /* Clear the screen of the stream and add them to the list of streams */
+        stream.write_all(&CLEAR)?;
+        streams.insert(ip, stream);
+        Ok(())
+    }
 }

@@ -1,9 +1,3 @@
-use std::{
-    collections::HashMap,
-    net::IpAddr,
-    sync::{Arc, Mutex, MutexGuard, PoisonError},
-};
-
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub struct Error(String);
@@ -14,14 +8,8 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<PoisonError<MutexGuard<'_, usize>>> for Error {
-    fn from(value: PoisonError<MutexGuard<'_, usize>>) -> Self {
-        Self(value.to_string())
-    }
-}
-
-impl From<PoisonError<MutexGuard<'_, HashMap<IpAddr, Arc<Mutex<usize>>>>>> for Error {
-    fn from(value: PoisonError<MutexGuard<'_, HashMap<IpAddr, Arc<Mutex<usize>>>>>) -> Self {
+impl From<httparse::Error> for Error {
+    fn from(value: httparse::Error) -> Self {
         Self(value.to_string())
     }
 }

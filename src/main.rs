@@ -46,9 +46,9 @@ fn main() -> Result<()> {
             }
 
             //  send each stream the current frame
-            for (ip, mut stream) in streams.iter().clone() {
+            for (ip, mut stream) in streams.iter() {
                 //  fails if the stream disconnected from the server
-                if let Err(_) = stream.write_all(frame.as_slice()) {
+                if let Err(_) = stream.write_all(frame) {
                     disconnected.push(*ip)
                 }
             }

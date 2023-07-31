@@ -9,8 +9,8 @@ pub const CLEAR: &'static [u8] = concatcp!(HEADER, "\x1b[2J").as_bytes();
 /** Sent to the client to display the *greedy* message */
 pub const GREED: &'static [u8] = concatcp!(HEADER, "you greedy fool\n").as_bytes();
 
-/** The delay between each frame */
-pub const DELAY: Duration = Duration::from_millis(16);
+/** The delay between each frame (this is roughly 48 fps) */
+pub const DELAY: Duration = Duration::from_micros(20833);
 
 /** The characters required to make each donut frame */
 pub const CHARACTERS: [char; 12] = ['.', ',', '-', '~', ':', ';', '=', '!', '*', '#', '$', '@'];

@@ -2,6 +2,12 @@
 
 Inspired by [parrot.live](https://github.com/hugomd/parrot.live). Here it is in donut form.
 
+## Example
+```
+curl gronk.rustychads.com/donut
+```
+
+
 ## Description
 - Self-hosted server that distributes frames of a rotating donut to every [curl](https://en.wikipedia.org/wiki/CURL) client
 

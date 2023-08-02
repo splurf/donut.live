@@ -1,33 +1,27 @@
-mod constants;
-mod donut;
-mod error;
-mod handler;
+mod cfg;
+mod consts;
+mod err;
+mod util;
 
 use {
-    constants::DELAY,
-    donut::*,
-    error::*,
-    handler::*,
+    cfg::*,
+    clap::Parser,
+    consts::DELAY,
+    err::*,
     std::{
         collections::HashMap,
-        env::args,
         io::Write,
-        net::{IpAddr, TcpListener, TcpStream, ToSocketAddrs},
+        net::{IpAddr, TcpListener, TcpStream},
         thread::sleep,
     },
+    util::*,
 };
 
 fn main() -> Result<()> {
-    //  retrieve specfied address or default to `localhost`
-    let addr = args()
-        .nth(1)
-        .unwrap_or("localhost:80".into())
-        .to_socket_addrs()?
-        .next()
-        .ok_or("Invalid provided address")?;
+    let cfg = Config::parse();
 
     //  initiate the listener
-    let server = TcpListener::bind(addr)?;
+    let server = TcpListener::bind(cfg.addr())?;
     server.set_nonblocking(true)?;
 
     //  generate the donuts
@@ -36,11 +30,13 @@ fn main() -> Result<()> {
     let mut streams: HashMap<IpAddr, TcpStream> = Default::default();
     let mut disconnected: Vec<IpAddr> = Default::default();
 
+    println!("Listening @ http://{}{}\n", cfg.addr(), cfg.path());
+
     loop {
         for frame in frames.iter() {
             //  handle any potential stream waiting to be accepted by the server
             if let Ok((stream, addr)) = server.accept() {
-                if let Err(e) = handle_stream(stream, addr.ip(), &mut streams) {
+                if let Err(e) = handle_stream(stream, addr.ip(), &mut streams, cfg.path()) {
                     eprintln!("{}", e)
                 }
             }

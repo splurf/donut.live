@@ -16,3 +16,12 @@ default-features = false
 [dependencies.const_format]
 version = "0.2.31"
 default-features = false
+
+[dependencies.clap]
+version = "4.3.11"
+default-features = false
+features = ["std", "derive", "help", "color", "usage", "error-context"]
+
+[dependencies.uriparse]
+version = "0.6.4"
+default-features = false

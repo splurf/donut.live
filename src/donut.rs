@@ -11,7 +11,7 @@ fn generate_frame(
     j: &mut f32,
     z: &mut [f32; 1760],
     p: &mut [char; 1760],
-) -> Box<[u8; 1784]> {
+) -> Box<[u8; 1781]> {
     while *j < TAU {
         while *i < TAU {
             let c = f32::sin(*i);
@@ -45,13 +45,10 @@ fn generate_frame(
 
     let frames = Box::new(
         TryInto::try_into(
-            format!(
-                "\x1b[H{}",
-                p.chunks_exact(80)
+            p.chunks_exact(80)
                     .map(|l| l.into_iter().collect())
                     .collect::<Vec<String>>()
                     .join("\n")
-            )
             .as_bytes(),
         )
         .expect("Failed to convert `Vec<u8>` into `[u8; 1784]` due to unknown reasons"),
@@ -64,11 +61,22 @@ fn generate_frame(
     frames
 }
 
+pub fn trim_frame(frame: &Box<[u8; 1781]>) -> usize {
+    let x = frame.split(|c| *c == 10).map(|c| c.to_vec()).collect::<Vec<Vec<u8>>>();
+
+    let only_donuts = x.into_iter().filter_map(|line| line.iter().position(|c| *c != 32)).collect::<Vec<usize>>();
+
+    println!("{}", only_donuts.iter().min().unwrap());
+
+    let min = *only_donuts.iter().min().unwrap();
+    return min;
+}
+
 /**
  * *donut.c* rewritten and refactored into rust
  * Stores each individually generated frame of the donut into a two dimensional array of boxed fixed arrays.
  */
-pub fn donuts() -> [Box<[u8; 1784]>; 314] {
+pub fn donuts() -> [Box<[u8; 1781]>; 314] {
     let mut a = 0.0;
     let mut b = 0.0;
 

@@ -1,3 +1,5 @@
+use std::{env::set_current_dir, fs::File, io::stdout};
+
 mod constants;
 mod donut;
 mod error;
@@ -18,6 +20,29 @@ use {
 };
 
 fn main() -> Result<()> {
+
+    let mut stdout = stdout();
+    let frames = donuts();
+    set_current_dir("donuts-gen")?;
+
+    for (i, frame) in frames.iter().enumerate() {
+        let min = trim_frame(frame);
+        stdout.write_all(frame.split(|c| *c == 10).map(|l| l[min..].to_vec()).collect::<Vec<Vec<u8>>>().join(&10).as_slice())?;
+        stdout.write_all(b"\x1b[H")?;
+
+        // let mut file = File::create(format!("{}.txt", i))?;
+        // let x = frame.split(|c| *c == 10).map(|l| l[min..].to_vec()).collect::<Vec<Vec<u8>>>().join(&10);
+        // file.write_all(&x)?;
+        // file.flush()?;
+        sleep(DELAY)
+    }
+
+    return Ok(());
+
+
+
+
+
     //  retrieve specfied address or default to `localhost`
     let addr = args()
         .nth(1)

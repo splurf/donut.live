@@ -45,7 +45,10 @@ pub enum Error {
     HttpParse(httparse::Error),
     UriParse(uriparse::PathError),
     Misc(Invalid),
+<<<<<<< HEAD
     Sync,
+=======
+>>>>>>> e13826e13ffea178880ea30ab20dd6cad2efd513
 }
 
 impl From<std::io::Error> for Error {
@@ -72,6 +75,7 @@ impl<T: Into<Invalid>> From<T> for Error {
     }
 }
 
+<<<<<<< HEAD
 impl<T> From<std::sync::PoisonError<std::sync::RwLockReadGuard<'_, T>>> for Error {
     fn from(_: std::sync::PoisonError<std::sync::RwLockReadGuard<'_, T>>) -> Self {
         Self::Sync
@@ -96,6 +100,8 @@ impl From<Box<dyn std::any::Any + Send + 'static>> for Error {
     }
 }
 
+=======
+>>>>>>> e13826e13ffea178880ea30ab20dd6cad2efd513
 impl std::fmt::Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self, f)
@@ -109,7 +115,10 @@ impl std::fmt::Display for Error {
             Self::HttpParse(e) => e.to_string(),
             Self::UriParse(e) => e.to_string(),
             Self::Misc(e) => e.to_string(),
+<<<<<<< HEAD
             Self::Sync => "An unexpected poison error has ocurred".to_string(),
+=======
+>>>>>>> e13826e13ffea178880ea30ab20dd6cad2efd513
         })
     }
 }

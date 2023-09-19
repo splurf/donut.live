@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 [package]
 name = "donut-live"
 version = "0.1.0"
@@ -21,32 +20,4 @@ features = ["std", "derive", "help", "color", "usage", "error-context"]
 
 [dependencies.uriparse]
 version = "0.6.4"
-=======
-[package]
-name = "donut-live"
-version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[profile.release]
-lto = "fat"
-codegen-units = 1
-
-[dependencies.httparse]
-version = "1.8.0"
-default-features = false
-
-[dependencies.const_format]
-version = "0.2.31"
-default-features = false
-
-[dependencies.clap]
-version = "4.3.11"
-default-features = false
-features = ["std", "derive", "help", "color", "usage", "error-context"]
-
-[dependencies.uriparse]
-version = "0.6.4"
->>>>>>> e13826e13ffea178880ea30ab20dd6cad2efd513
 default-features = false

@@ -1,10 +1,6 @@
 use {
     super::{
-<<<<<<< HEAD
         consts::{CHARACTERS, CLEAR},
-=======
-        consts::{CHARACTERS, CLEAR, GREED},
->>>>>>> e13826e13ffea178880ea30ab20dd6cad2efd513
         err::*,
     },
     httparse::{Request, EMPTY_HEADER},
@@ -12,12 +8,8 @@ use {
         collections::HashMap,
         f32::consts::TAU,
         io::{Read, Write},
-<<<<<<< HEAD
         net::{Shutdown, TcpStream},
         sync::RwLockWriteGuard,
-=======
-        net::{IpAddr, Shutdown, TcpStream},
->>>>>>> e13826e13ffea178880ea30ab20dd6cad2efd513
     },
 };
 
@@ -31,13 +23,8 @@ fn generate_frame(
     i: &mut f32,
     j: &mut f32,
     z: &mut [f32; 1760],
-<<<<<<< HEAD
     p: &mut [u8; 1760],
 ) -> Vec<u8> {
-=======
-    p: &mut [char; 1760],
-) -> [u8; 1784] {
->>>>>>> e13826e13ffea178880ea30ab20dd6cad2efd513
     while *j < TAU {
         while *i < TAU {
             let c = f32::sin(*i);
@@ -69,7 +56,6 @@ fn generate_frame(
     *a += 0.04;
     *b += 0.02;
 
-<<<<<<< HEAD
     let frame = p
         .chunks_exact(80)
         .map(<[u8]>::to_vec)
@@ -81,36 +67,13 @@ fn generate_frame(
     *j = 0.0;
 
     frame
-=======
-    //  the conversion here is completely safe
-    let frames = format!(
-        "\x1b[H{}",
-        p.chunks_exact(80)
-            .map(|l| l.into_iter().collect())
-            .collect::<Vec<String>>()
-            .join("\n")
-    )
-    .as_bytes()
-    .try_into()
-    .unwrap();
-
-    *p = [' '; 1760];
-    *z = [0.0; 1760];
-    *j = 0.0;
-
-    frames
->>>>>>> e13826e13ffea178880ea30ab20dd6cad2efd513
 }
 
 /**
  * *donut.c* rewritten and refactored into rust
  * Stores each individually generated frame of the donut into a two dimensional array of fixed sizes.
  */
-<<<<<<< HEAD
 pub fn donuts() -> [Vec<u8>; 314] {
-=======
-pub fn donuts() -> [[u8; 1784]; 314] {
->>>>>>> e13826e13ffea178880ea30ab20dd6cad2efd513
     let mut a = 0.0;
     let mut b = 0.0;
 
@@ -118,7 +81,6 @@ pub fn donuts() -> [[u8; 1784]; 314] {
     let mut j = 0.0;
 
     let mut z = [0.0; 1760];
-<<<<<<< HEAD
     let mut p = [32; 1760];
 
     // generate the original `donut` frames
@@ -176,13 +138,6 @@ pub fn trim_frames(frames: &mut [Vec<u8>; 314]) {
     });
 }
 
-=======
-    let mut p = [' '; 1760];
-
-    [0; 314].map(|_| generate_frame(&mut a, &mut b, &mut i, &mut j, &mut z, &mut p))
-}
-
->>>>>>> e13826e13ffea178880ea30ab20dd6cad2efd513
 /** Verify the potential stream by checking if the User-Agent's product is `curl` and a few other practicalities */
 fn verify_stream(mut stream: &TcpStream, uri_path: &str) -> Result<()> {
     let mut buf = [0; 128];
@@ -222,37 +177,18 @@ fn verify_stream(mut stream: &TcpStream, uri_path: &str) -> Result<()> {
 
 pub fn handle_stream(
     mut stream: TcpStream,
-<<<<<<< HEAD
     port: u16,
     mut streams: RwLockWriteGuard<HashMap<u16, TcpStream>>,
-=======
-    ip: IpAddr,
-    streams: &mut HashMap<IpAddr, TcpStream>,
->>>>>>> e13826e13ffea178880ea30ab20dd6cad2efd513
     path: &str,
 ) -> Result<()> {
     verify_stream(&stream, path)?;
 
-<<<<<<< HEAD
     if streams.contains_key(&port) {
         /* Send the refused stream a goodbye message then shutdown the connection */
         stream.shutdown(Shutdown::Both)?
     } else {
-        /* Clear the screen of the stream and add them to the list of streams */
         stream.write_all(&CLEAR)?;
         streams.insert(port, stream);
     }
     Ok(())
-=======
-    if streams.contains_key(&ip) {
-        /* Send the refused stream a goodbye message then shutdown the connection */
-        stream.write_all(&GREED)?;
-        stream.shutdown(Shutdown::Both).map_err(Into::into)
-    } else {
-        /* Clear the screen of the stream and add them to the list of streams */
-        stream.write_all(&CLEAR)?;
-        streams.insert(ip, stream);
-        Ok(())
-    }
->>>>>>> e13826e13ffea178880ea30ab20dd6cad2efd513
 }

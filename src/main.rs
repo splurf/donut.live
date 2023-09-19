@@ -11,19 +11,13 @@ use {
     std::{
         collections::HashMap,
         io::Write,
-<<<<<<< HEAD
         net::{TcpListener, TcpStream},
         sync::{Arc, Condvar, Mutex, RwLock},
         thread::{sleep, spawn, JoinHandle},
-=======
-        net::{IpAddr, TcpListener, TcpStream},
-        thread::sleep,
->>>>>>> e13826e13ffea178880ea30ab20dd6cad2efd513
     },
     util::*,
 };
 
-<<<<<<< HEAD
 fn wait(pair: &Arc<(Mutex<bool>, Condvar)>) -> Result<()> {
     let (g, cvar) = &**pair;
     let mut started = g.lock()?;
@@ -43,28 +37,6 @@ fn incoming_handler(
             //  handle any potential stream waiting to be accepted by the server
             if let Ok((stream, addr)) = server.accept() {
                 if let Err(e) = handle_stream(stream, addr.port(), streams.0.write()?, &path) {
-=======
-fn main() -> Result<()> {
-    let cfg = Config::parse();
-
-    //  initiate the listener
-    let server = TcpListener::bind(cfg.addr())?;
-    server.set_nonblocking(true)?;
-
-    //  generate the donuts
-    let frames = donuts();
-
-    let mut streams: HashMap<IpAddr, TcpStream> = Default::default();
-    let mut disconnected: Vec<IpAddr> = Default::default();
-
-    println!("Listening @ http://{}{}\n", cfg.addr(), cfg.path());
-
-    loop {
-        for frame in frames.iter() {
-            //  handle any potential stream waiting to be accepted by the server
-            if let Ok((stream, addr)) = server.accept() {
-                if let Err(e) = handle_stream(stream, addr.ip(), &mut streams, cfg.path()) {
->>>>>>> e13826e13ffea178880ea30ab20dd6cad2efd513
                     eprintln!("{}", e)
                 } else {
                     *streams.1 .0.lock()? = true;
@@ -131,19 +103,12 @@ fn main_thread(
             }
 
             //  send each stream the current frame
-<<<<<<< HEAD
             for (ip, mut stream) in streams.0.read()?.iter() {
                 //  fails if the stream disconnected from the server
                 if let Err(_) = stream.write_all(frame) {
                     disconnected.0.write()?.push(*ip);
                     *disconnected.1 .0.lock()? = true;
                     disconnected.1 .1.notify_one()
-=======
-            for (ip, mut stream) in streams.iter() {
-                //  fails if the stream disconnected from the server
-                if let Err(_) = stream.write_all(frame) {
-                    disconnected.push(*ip)
->>>>>>> e13826e13ffea178880ea30ab20dd6cad2efd513
                 }
             }
             sleep(DELAY)

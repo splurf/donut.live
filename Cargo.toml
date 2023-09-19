@@ -13,6 +13,11 @@ codegen-units = 1
 version = "1.8.0"
 default-features = false
 
-[dependencies.const_format]
-version = "0.2.31"
+[dependencies.clap]
+version = "4.3.11"
+default-features = false
+features = ["std", "derive", "help", "color", "usage", "error-context"]
+
+[dependencies.uriparse]
+version = "0.6.4"
 default-features = false

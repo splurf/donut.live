@@ -1,6 +1,7 @@
 mod cfg;
 mod consts;
 mod err;
+mod sync;
 mod util;
 
 use {
@@ -12,74 +13,68 @@ use {
         collections::HashMap,
         io::Write,
         net::{TcpListener, TcpStream},
-        sync::{Arc, Condvar, Mutex, RwLock},
         thread::{sleep, spawn, JoinHandle},
     },
+    sync::*,
     util::*,
 };
 
-fn wait(pair: &Arc<(Mutex<bool>, Condvar)>) -> Result<()> {
-    let (g, cvar) = &**pair;
-    let mut started = g.lock()?;
-    while !*started {
-        started = cvar.wait(started)?;
-    }
-    Ok(())
-}
-
+/** Validate and instantiate streams into the system */
 fn incoming_handler(
     server: TcpListener,
-    streams: Arc<(RwLock<HashMap<u16, TcpStream>>, Arc<(Mutex<bool>, Condvar)>)>,
+    streams: CondLock<HashMap<u16, TcpStream>>,
     path: String,
 ) -> JoinHandle<Result<()>> {
     spawn(move || -> Result<()> {
         loop {
-            //  handle any potential stream waiting to be accepted by the server
+            // handle any potential stream waiting to be accepted by the server
             if let Ok((stream, addr)) = server.accept() {
-                if let Err(e) = handle_stream(stream, addr.port(), streams.0.write()?, &path) {
+                if let Err(e) = handle_stream(stream, addr.port(), streams.write()?, &path) {
                     eprintln!("{}", e)
                 } else {
-                    *streams.1 .0.lock()? = true;
-                    streams.1 .1.notify_one();
+                    *streams.lock()? = true;
+                    streams.notify_one();
                 }
             }
         }
     })
 }
 
+/** Automatically remove any disconnected clients */
 fn error_handler(
-    streams: Arc<(RwLock<HashMap<u16, TcpStream>>, Arc<(Mutex<bool>, Condvar)>)>,
-    disconnected: Arc<(RwLock<Vec<u16>>, Arc<(Mutex<bool>, Condvar)>)>,
+    streams: CondLock<HashMap<u16, TcpStream>>,
+    disconnected: CondLock<Vec<u16>>,
 ) -> JoinHandle<Result<()>> {
     spawn(move || -> Result<()> {
         loop {
             // wait for at least one connection to be lost
-            wait(&disconnected.1)?;
+            disconnected.wait()?;
 
-            //  remove every disconnected stream
-            while let Some(ip) = disconnected.0.write()?.pop() {
-                streams.0.write()?.remove(&ip);
-                let is_empty = streams.0.read()?.is_empty();
-                *streams.1 .0.lock()? = !is_empty;
+            // remove every disconnected stream
+            while let Some(ip) = disconnected.write()?.pop() {
+                streams.write()?.remove(&ip);
+                let is_empty = streams.read()?.is_empty();
+                *streams.lock()? = !is_empty;
             }
             // reset the condition variable
-            *disconnected.1 .0.lock()? = false;
+            *disconnected.lock()? = false;
         }
     })
 }
 
+/** Distribute frames to every connected client */
 fn main_thread(
     cfg: Config,
-    streams: Arc<(RwLock<HashMap<u16, TcpStream>>, Arc<(Mutex<bool>, Condvar)>)>,
-    disconnected: Arc<(RwLock<Vec<u16>>, Arc<(Mutex<bool>, Condvar)>)>,
+    streams: CondLock<HashMap<u16, TcpStream>>,
+    disconnected: CondLock<Vec<u16>>,
     th1: JoinHandle<Result<()>>,
     th2: JoinHandle<Result<()>>,
 ) -> Result<()> {
-    // original donuts
-    let mut frames = donuts(); // |  559234 bytes
-                               // trim redundant whitespace
-    trim_frames(&mut frames); //  |  395012 bytes
-                              // results in a 29.37% size reduction
+    // original frames (stored in memory)
+    let mut frames = donuts(); // 559234 bytes
+
+    // trim the majority of the unnecessary whitespace
+    trim_frames(&mut frames); // 395012 bytes (~29% smaller)
 
     println!("Listening @ http://{}{}\n", cfg.addr(), cfg.path());
 
@@ -87,28 +82,26 @@ fn main_thread(
         // if either of these threads have finished,
         // end the main thread because an unexpected
         // poison error as ocurred
-        if th1.is_finished() {
-            break th1.join()?;
-        } else if th2.is_finished() {
-            break th2.join()?;
+        if th1.is_finished() || th2.is_finished() {
+            break Ok(());
         }
         // wait until there is at least one connection
-        wait(&streams.1)?;
+        streams.wait()?;
 
         // distribute frames to each client
         for frame in frames.iter() {
             // stop distributing if there are no connections
-            if !*streams.1 .0.lock()? {
+            if !*streams.lock()? {
                 break;
             }
 
-            //  send each stream the current frame
-            for (ip, mut stream) in streams.0.read()?.iter() {
-                //  fails if the stream disconnected from the server
+            // send each stream the current frame
+            for (ip, mut stream) in streams.read()?.iter() {
+                // completely remove the client if they have disconnected
                 if let Err(_) = stream.write_all(frame) {
-                    disconnected.0.write()?.push(*ip);
-                    *disconnected.1 .0.lock()? = true;
-                    disconnected.1 .1.notify_one()
+                    disconnected.write()?.push(*ip);
+                    *disconnected.lock()? = true;
+                    disconnected.notify_one()
                 }
             }
             sleep(DELAY)
@@ -117,14 +110,17 @@ fn main_thread(
 }
 
 fn main() -> Result<()> {
+    // handle any arguments
     let cfg = Config::parse();
 
-    //  initiate the listener
+    // instantiate the listener
     let server = TcpListener::bind(cfg.addr())?;
 
-    let streams: Arc<(RwLock<HashMap<u16, TcpStream>>, Arc<(Mutex<bool>, Condvar)>)> =
-        Default::default();
-    let disconnected: Arc<(RwLock<Vec<u16>>, Arc<(Mutex<bool>, Condvar)>)> = Default::default();
+    // the list of currently connected clients
+    let streams = CondLock::<HashMap<u16, TcpStream>>::default();
+
+    // the list of clients that have disconnected
+    let disconnected = CondLock::<Vec<u16>>::default();
 
     let th1 = incoming_handler(server, streams.clone(), cfg.path().to_string());
     let th2 = error_handler(streams.clone(), disconnected.clone());

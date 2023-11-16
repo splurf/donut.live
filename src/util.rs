@@ -13,10 +13,7 @@ use {
     },
 };
 
-/**
- * Generate a single frame of the donut based on the given variables
- * Helper method of `donuts`
- */
+/** Generate a single frame of the donut based on the given variables */
 fn generate_frame(
     a: &mut f32,
     b: &mut f32,
@@ -69,10 +66,7 @@ fn generate_frame(
     frame
 }
 
-/**
- * *donut.c* rewritten and refactored into rust
- * Stores each individually generated frame of the donut into a two dimensional array of fixed sizes.
- */
+/** *donut.c* refactored into rust */
 pub fn donuts() -> [Vec<u8>; 314] {
     let mut a = 0.0;
     let mut b = 0.0;
@@ -87,9 +81,10 @@ pub fn donuts() -> [Vec<u8>; 314] {
     [0; 314].map(|_| generate_frame(&mut a, &mut b, &mut i, &mut j, &mut z, &mut p))
 }
 
-// not the most optimized algo but it's only used once so I don't really care tbh
-//
-// TODO - trim all redundant whitespace
+/**
+ * Trim the *majority* of the unnecessary whitespace at the end of each line of every frame
+ * TODO - trim all redundant whitespace
+*/
 pub fn trim_frames(frames: &mut [Vec<u8>; 314]) {
     // return the lines of each frame
     fn split<'a>(f: &'a [u8]) -> impl Iterator<Item = Vec<u8>> + 'a {
@@ -138,7 +133,7 @@ pub fn trim_frames(frames: &mut [Vec<u8>; 314]) {
     });
 }
 
-/** Verify the potential stream by checking if the User-Agent's product is `curl` and a few other practicalities */
+/** Verify the potential client by checking if the User-Agent's product is `curl` and a few other practicalities */
 fn verify_stream(mut stream: &TcpStream, uri_path: &str) -> Result<()> {
     let mut buf = [0; 128];
     let bytes = stream.read(&mut buf)?;
@@ -148,14 +143,16 @@ fn verify_stream(mut stream: &TcpStream, uri_path: &str) -> Result<()> {
     _ = req.parse(&buf[..bytes])?;
 
     if let (Some(method), Some(path), Some(version)) = (req.method, req.path, req.version) {
-        let user_agent = headers
-            .iter()
-            .find_map(|h| (h.name == "User-Agent").then_some(h.value))
-            .ok_or::<Error>(Header::UserAgent.into())?;
-        let accept = headers
-            .iter()
-            .find_map(|h| (h.name == "Accept").then_some(h.value))
-            .ok_or::<Error>(Header::Accept.into())?;
+        // convenience closure for finding a specific header
+        let find_header = |header: Header| -> Result<&[u8]> {
+            let name = header.as_ref();
+            headers
+                .iter()
+                .find_map(|h| (h.name == name).then_some(h.value))
+                .ok_or(header.into())
+        };
+        let user_agent = find_header(Header::UserAgent)?;
+        let accept = find_header(Header::Accept)?;
 
         if method != "GET" {
             Err(Header::Method.into())
@@ -181,14 +178,15 @@ pub fn handle_stream(
     mut streams: RwLockWriteGuard<HashMap<u16, TcpStream>>,
     path: &str,
 ) -> Result<()> {
+    // determine the authenticity of the stream
     verify_stream(&stream, path)?;
 
     if streams.contains_key(&port) {
-        /* Send the refused stream a goodbye message then shutdown the connection */
-        stream.shutdown(Shutdown::Both)?
+        stream.shutdown(Shutdown::Both)?; // close the connection
+        Err(Invalid::DuplicateStream.into()) // this is fairly irregular
     } else {
-        stream.write_all(&CLEAR)?;
-        streams.insert(port, stream);
+        stream.write_all(&CLEAR)?; // clear the client's terminal
+        streams.insert(port, stream); // add the client to the list of current streams
+        Ok(())
     }
-    Ok(())
 }

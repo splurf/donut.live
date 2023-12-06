@@ -4,7 +4,7 @@ Inspired by [parrot.live](https://github.com/hugomd/parrot.live). Here it is in 
 
 ## Demo - Try It
 ```
-curl gronk.rustychads.com/donut
+curl donut.rustychads.com
 ```
 
 

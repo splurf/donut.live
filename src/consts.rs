@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-/** Sent to the client to *clear* their terminal */
-pub const CLEAR: &'static [u8] =
-    b"HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n\x1b[2J";
+/** The initial HTTP response headers appended with the `ESC[2J` erase function */
+pub const INIT: &'static [u8] =
+    b"HTTP/2 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n\x1b[2J";
 
 /** The delay between each frame (this is roughly 48 fps) */
 pub const DELAY: Duration = Duration::from_micros(20833);

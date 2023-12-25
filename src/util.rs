@@ -1,6 +1,6 @@
 use {
     super::{
-        consts::{CHARACTERS, CLEAR},
+        consts::{CHARACTERS, INIT},
         err::*,
     },
     httparse::{Request, EMPTY_HEADER},
@@ -83,7 +83,7 @@ pub fn donuts() -> [Vec<u8>; 314] {
 
 /**
  * Trim the *majority* of the unnecessary whitespace at the end of each line of every frame
- * TODO - trim all redundant whitespace
+ * TODO - trim all redundant whitespace, without altering how the frames look
 */
 pub fn trim_frames(frames: &mut [Vec<u8>; 314]) {
     // return the lines of each frame
@@ -135,35 +135,34 @@ pub fn trim_frames(frames: &mut [Vec<u8>; 314]) {
 
 /** Verify the potential client by checking if the User-Agent's product is `curl` and a few other practicalities */
 fn verify_stream(mut stream: &TcpStream, uri_path: &str) -> Result<()> {
+    // read from the incoming stream
     let mut buf = [0; 128];
     let bytes = stream.read(&mut buf)?;
 
+    // parse the request
     let mut headers = [EMPTY_HEADER; 8];
     let mut req = Request::new(&mut headers);
     _ = req.parse(&buf[..bytes])?;
 
     if let (Some(method), Some(path), Some(version)) = (req.method, req.path, req.version) {
-        // convenience closure for finding a specific header
-        let find_header = |header: Header| -> Result<&[u8]> {
-            let name = header.as_ref();
-            headers
-                .iter()
-                .find_map(|h| (h.name == name).then_some(h.value))
-                .ok_or(header.into())
-        };
-        let user_agent = find_header(Header::UserAgent)?;
-        let accept = find_header(Header::Accept)?;
-
         if method != "GET" {
-            Err(Header::Method.into())
+            Err(UriError::Method(method.to_string()).into())
         } else if path != uri_path {
-            Err(Header::Path.into())
+            Err(UriError::Path(path.to_string()).into())
         } else if version != 1 {
-            Err(Header::Version.into())
-        } else if !user_agent.starts_with(b"curl") {
-            Err(Header::UserAgent.into())
-        } else if accept != b"*/*" {
-            Err(Header::Accept.into())
+            Err(UriError::Version(version).into())
+        } else if let Some(h) = req
+            .headers
+            .into_iter()
+            .take_while(|h| !h.name.is_empty())
+            .filter_map(|h| match h.name {
+                "User-Agent" => (!h.value.starts_with(b"curl")).then_some(h),
+                "Accept" => (h.value != b"*/*").then_some(h),
+                _ => None,
+            })
+            .next()
+        {
+            Err(UriError::from(h).into())
         } else {
             Ok(())
         }
@@ -185,7 +184,7 @@ pub fn handle_stream(
         stream.shutdown(Shutdown::Both)?; // close the connection
         Err(Invalid::DuplicateStream.into()) // this is fairly irregular
     } else {
-        stream.write_all(&CLEAR)?; // clear the client's terminal
+        stream.write_all(&INIT)?; // clear the client's terminal
         streams.insert(port, stream); // add the client to the list of current streams
         Ok(())
     }

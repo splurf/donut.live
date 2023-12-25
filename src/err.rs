@@ -1,60 +1,71 @@
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-pub enum Header {
-    Method,
-    Path,
-    Version,
-    UserAgent,
-    Accept,
+pub enum UriError {
+    HttpParse(httparse::Error),
+    UriParse(uriparse::PathError),
+    Method(String),
+    Path(String),
+    Version(u8),
+    Header(String),
 }
 
-impl AsRef<str> for Header {
-    fn as_ref(&self) -> &str {
+impl<'a> From<&mut httparse::Header<'a>> for UriError {
+    fn from(value: &mut httparse::Header<'a>) -> Self {
+        Self::Header(format!(
+            "{{ {}: {} }}",
+            value.name,
+            String::from_utf8_lossy(value.value)
+        ))
+    }
+}
+
+impl ToString for UriError {
+    fn to_string(&self) -> String {
         match self {
-            Self::Method => "Method",
-            Self::Path => "Path",
-            Self::Version => "Version",
-            Self::UserAgent => "User-Agent",
-            Self::Accept => "Accept",
+            Self::HttpParse(e) => e.to_string(),
+            Self::UriParse(e) => e.to_string(),
+            Self::Method(s) => format!("method {}", s),
+            Self::Path(s) => format!("path {}", s),
+            Self::Version(v) => format!("version {}", v),
+            Self::Header(s) => format!("header {}", s),
         }
     }
 }
 
 pub enum Invalid {
-    HttpParse(httparse::Error),
-    UriParse(uriparse::PathError),
-    Header(Header),
+    Uri(UriError),
     DuplicateStream,
     Format,
 }
 
 impl ToString for Invalid {
     fn to_string(&self) -> String {
-        match self {
-            Self::HttpParse(e) => e.to_string(),
-            Self::UriParse(e) => e.to_string(),
-            Self::Header(h) => format!("Invalid `{}` header value", h.as_ref()),
-            Self::DuplicateStream => "Invalid duplicate stream".to_string(),
-            Self::Format => "Invalid http format".to_string(),
-        }
+        format!(
+            "Invalid {}",
+            match self {
+                Self::Uri(e) => e.to_string(),
+                Self::DuplicateStream => "duplicate stream".to_string(),
+                Self::Format => "http format".to_string(),
+            }
+        )
     }
 }
 
 impl From<httparse::Error> for Invalid {
     fn from(value: httparse::Error) -> Self {
-        Self::HttpParse(value)
+        UriError::HttpParse(value).into()
     }
 }
 
 impl From<uriparse::PathError> for Invalid {
     fn from(value: uriparse::PathError) -> Self {
-        Self::UriParse(value)
+        UriError::UriParse(value).into()
     }
 }
 
-impl From<Header> for Invalid {
-    fn from(value: Header) -> Self {
-        Self::Header(value)
+impl From<UriError> for Invalid {
+    fn from(value: UriError) -> Self {
+        Self::Uri(value)
     }
 }
 
@@ -94,8 +105,8 @@ impl<T> From<std::sync::PoisonError<std::sync::MutexGuard<'_, T>>> for Error {
     }
 }
 
-impl From<Box<dyn std::any::Any + Send + 'static>> for Error {
-    fn from(_: Box<dyn std::any::Any + Send + 'static>) -> Self {
+impl From<Box<dyn std::any::Any + Send>> for Error {
+    fn from(_: Box<dyn std::any::Any + Send>) -> Self {
         Self::Sync
     }
 }

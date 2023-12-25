@@ -1,6 +1,9 @@
 use {
     super::Result,
-    std::sync::{Arc, Condvar, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard},
+    std::{
+        ops::Deref,
+        sync::{Arc, Condvar, Mutex, MutexGuard, RwLock},
+    },
 };
 
 /**
@@ -10,16 +13,6 @@ use {
 pub struct CondLock<T>(Arc<(RwLock<T>, Mutex<bool>, Condvar)>);
 
 impl<T> CondLock<T> {
-    /** Return a guard of the data with exclusuve read access */
-    pub fn read(&self) -> Result<RwLockReadGuard<T>> {
-        self.0 .0.read().map_err(Into::into)
-    }
-
-    /** Return a guard of the data with exclusuve write access */
-    pub fn write(&self) -> Result<RwLockWriteGuard<T>> {
-        self.0 .0.write().map_err(Into::into)
-    }
-
     /** Acquires the mutex for the boolean predicate */
     pub fn lock(&self) -> Result<MutexGuard<bool>> {
         self.0 .1.lock().map_err(Into::into)
@@ -36,7 +29,7 @@ impl<T> CondLock<T> {
     }
 
     /** Wakes up one blocked thread on the condition variable */
-    pub fn notify_one(&self) {
+    pub fn notify(&self) {
         self.0 .2.notify_one()
     }
 }
@@ -44,5 +37,13 @@ impl<T> CondLock<T> {
 impl<T> Clone for CondLock<T> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
+    }
+}
+
+impl<T> Deref for CondLock<T> {
+    type Target = RwLock<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0 .0
     }
 }

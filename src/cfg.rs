@@ -5,14 +5,6 @@ use {
     uriparse::Path,
 };
 
-fn validate_path(path: &str) -> Result<String> {
-    let mut path = Path::try_from(path)?.to_string();
-    if !path.starts_with('/') {
-        path.insert(0, '/')
-    }
-    Ok(path)
-}
-
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
 pub struct Config {
@@ -22,7 +14,13 @@ pub struct Config {
     #[arg(short, long, default_value_t = 8080)]
     port: u16,
 
-    #[arg(long, default_value_t = String::from("/"), value_parser = validate_path)]
+    #[arg(long, default_value_t = String::from("/"), value_parser = |path: &str| -> Result<String> {
+        let mut path = Path::try_from(path)?.to_string();
+        if !path.starts_with('/') {
+            path.insert(0, '/')
+        }
+        Ok(path)
+    })]
     path: String,
 }
 

@@ -7,7 +7,7 @@ A tribute to [parrot.live](https://github.com/hugomd/parrot.live). Here it is in
 curl donut.rustychads.com
 ```
 
-<div align="center" style="height: 50vh">
+<div align="center" style="height: 40vh">
   <img src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExaWZvZm1kZ3dia2hjdXQwajU0eTBsM3g3NGJzMTdzMnJ2Y2hlZjJueSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/PCZgwB0fEhRzcbNH6Z/source.gif"/>
 </div>
 
@@ -15,7 +15,7 @@ curl donut.rustychads.com
 - Self-hosted server that distributes frames of a rotating donut to every [curl](https://en.wikipedia.org/wiki/CURL) client
 
 ## Usage
-```k
+```
 Usage: donut-live [OPTIONS]
 
 Options:

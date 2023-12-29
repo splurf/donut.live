@@ -14,7 +14,7 @@ use {
 };
 
 /** Generate a single frame of the donut based on the given variables */
-fn generate_frame(
+fn gen_frame(
     a: &mut f32,
     b: &mut f32,
     i: &mut f32,
@@ -78,7 +78,7 @@ pub fn donuts() -> [Vec<u8>; 314] {
     let mut p = [32; 1760];
 
     // generate the original `donut` frames
-    [0; 314].map(|_| generate_frame(&mut a, &mut b, &mut i, &mut j, &mut z, &mut p))
+    [0; 314].map(|_| gen_frame(&mut a, &mut b, &mut i, &mut j, &mut z, &mut p))
 }
 
 /**

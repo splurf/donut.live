@@ -26,10 +26,10 @@ Options:
   -V, --version      Print version
 ```
 ## Todo
-+ Improve [trim_frames](https://github.com/splurf/donut.live/blob/master/src/util.rs#L88) by removing **all** possible redundant ASCII-whitespace from every frame.
++ Improve [trim_frames](https://github.com/splurf/donut.live/blob/master/src/util.rs#L87) by removing **all** possible redundant ASCII-whitespace from every frame.
 
 ## Notes
 + This works for terminals that support [ANSI Escape Sequences](https://en.wikipedia.org/wiki/ANSI_escape_code)
 
 ## Credit
-+ The [gen_frame](https://github.com/splurf/donut.live/blob/master/src/util.rs#L17) function within `util.rs` heavily references the original [donut.c](https://www.a1k0n.net/2011/07/20/donut-math.html) script
++ The [gen_frame](https://github.com/splurf/donut.live/blob/master/src/util.rs#L18) function within `util.rs` heavily references the original [donut.c](https://www.a1k0n.net/2011/07/20/donut-math.html) script

@@ -1,5 +1,5 @@
 use {
-    super::{
+    crate::{
         consts::{CHARACTERS, INIT},
         err::*,
     },
@@ -11,9 +11,10 @@ use {
         net::{Shutdown, TcpStream},
         sync::RwLockWriteGuard,
     },
+    uriparse::Path,
 };
 
-/** Generate a single frame of the donut based on the given variables */
+/// Generate a single frame of the donut based on the given variables
 fn gen_frame(
     a: &mut f32,
     b: &mut f32,
@@ -66,7 +67,7 @@ fn gen_frame(
     frame
 }
 
-/** *donut.c* refactored into rust */
+/// *donut.c* refactored into rust
 pub fn donuts() -> [Vec<u8>; 314] {
     let mut a = 0.0;
     let mut b = 0.0;
@@ -77,23 +78,20 @@ pub fn donuts() -> [Vec<u8>; 314] {
     let mut z = [0.0; 1760];
     let mut p = [32; 1760];
 
-    // generate the original `donut` frames
+    // Generate the original `donut` frames
     [0; 314].map(|_| gen_frame(&mut a, &mut b, &mut i, &mut j, &mut z, &mut p))
 }
 
-/**
- * Trim the *majority* of the unnecessary whitespace at the end of each line of every frame
- * TODO - trim all redundant whitespace, without altering how the frames look
-*/
+/// Trim the *majority* of the unnecessary whitespace at the end of each line of every frame
+/// TODO - Trim all redundant whitespace, without altering how the frames look
 pub fn trim_frames(frames: &mut [Vec<u8>; 314]) {
-    // return the lines of each frame
+    // Convenience method for returning the lines of each frame
     fn split<'a>(f: &'a [u8]) -> impl Iterator<Item = Vec<u8>> + 'a {
         f.split(|c| *c == 10).map(<[u8]>::to_vec)
     }
 
-    // this is pretty disgusting
-    //
-    // determine the maximum length of non-ascii of each line for every frame
+    // Determine the maximum length of non-ASCII of each line for every frame
+    // TODO - Improve this or come up with a better algorithm
     let maxes = {
         let mut out = [[0; 314]; 22];
 
@@ -122,7 +120,7 @@ pub fn trim_frames(frames: &mut [Vec<u8>; 314]) {
             .collect::<Vec<_>>()
     };
 
-    // drain the ascii of each line for every frame for their max length
+    // Drain the ASCII of each line for every frame for their max length
     frames.iter_mut().for_each(|f| {
         *f = split(f.as_slice())
             .enumerate()
@@ -133,18 +131,21 @@ pub fn trim_frames(frames: &mut [Vec<u8>; 314]) {
     });
 }
 
-/** Verify the potential client by checking if the User-Agent's product is `curl` and a few other practicalities */
+/// Verify the potential client by checking if the User-Agent's product is `curl` and a few other practicalities
 fn verify_stream(mut stream: &TcpStream, uri_path: &str) -> Result<()> {
-    // read from the incoming stream
+    // Read from the incoming stream
     let mut buf = [0; 128];
     let bytes = stream.read(&mut buf)?;
 
-    // parse the request
+    // Parse the request
     let mut headers = [EMPTY_HEADER; 8];
     let mut req = Request::new(&mut headers);
     _ = req.parse(&buf[..bytes])?;
 
-    if let (Some(method), Some(path), Some(version)) = (req.method, req.path, req.version) {
+    // Validate the request
+    if let (Some(method), Some(Ok(path)), Some(version)) =
+        (req.method, req.path.map(Path::try_from), req.version)
+    {
         if method != "GET" {
             Err(UriError::Method(method.to_string()).into())
         } else if path != uri_path {
@@ -171,21 +172,26 @@ fn verify_stream(mut stream: &TcpStream, uri_path: &str) -> Result<()> {
     }
 }
 
+/// Handler for every potential client
 pub fn handle_stream(
     mut stream: TcpStream,
     port: u16,
     mut streams: RwLockWriteGuard<HashMap<u16, TcpStream>>,
     path: &str,
 ) -> Result<()> {
-    // determine the authenticity of the stream
+    // Determine the authenticity of the stream
     verify_stream(&stream, path)?;
 
+    // Check if the stream already exists
     if streams.contains_key(&port) {
-        stream.shutdown(Shutdown::Both)?; // close the connection
-        Err(Invalid::DuplicateStream.into()) // this is fairly irregular
+        // Shutdown the connection
+        stream.shutdown(Shutdown::Both)?;
+        Err(Invalid::DuplicateStream.into())
     } else {
-        stream.write_all(&INIT)?; // clear the client's terminal
-        streams.insert(port, stream); // add the client to the list of current streams
+        // Setup the client's terminal
+        stream.write_all(&INIT)?;
+        // Add the stream to the map
+        streams.insert(port, stream);
         Ok(())
     }
 }

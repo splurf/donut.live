@@ -144,7 +144,7 @@ fn main() -> Result<()> {
                     break;
                 }
 
-                if {
+                let res = {
                     /*
                      * Acquire the writing guard of `disconnected`
                      * This doesn't cause a deadlock because `disconnected` is
@@ -162,13 +162,14 @@ fn main() -> Result<()> {
                     }
                     // Determinant for whether there have been any disconnections
                     g.len() > 0
-                } {
-                    /*
-                     * This only happens if there was at least one disconnection.
-                     *
-                     * Have `th2` handle the disconnections, while
-                     * this thread sleeps for the normal duration
-                     */
+                };
+                /*
+                 * This only happens if there was at least one disconnection.
+                 *
+                 * Have `th2` handle the disconnections, while
+                 * this thread sleeps for the normal duration
+                 */
+                if res {
                     *disconnected.lock()? = true;
                     disconnected.notify();
                 }

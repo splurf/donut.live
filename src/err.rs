@@ -34,7 +34,6 @@ impl ToString for UriError {
 
 pub enum Invalid {
     Uri(UriError),
-    DuplicateStream,
     Format,
 }
 
@@ -44,7 +43,6 @@ impl ToString for Invalid {
             "Invalid {}",
             match self {
                 Self::Uri(e) => e.to_string(),
-                Self::DuplicateStream => "duplicate stream".to_string(),
                 Self::Format => "http format".to_string(),
             }
         )

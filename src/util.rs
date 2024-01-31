@@ -8,7 +8,7 @@ use {
         collections::HashMap,
         f32::consts::TAU,
         io::{Read, Write},
-        net::{Shutdown, TcpStream},
+        net::TcpStream,
         sync::RwLockWriteGuard,
     },
     uriparse::Path,
@@ -86,7 +86,7 @@ pub fn donuts() -> [Vec<u8>; 314] {
 /// TODO - Trim all redundant whitespace, without altering how the frames look
 pub fn trim_frames(frames: &mut [Vec<u8>; 314]) {
     // Convenience method for returning the lines of each frame
-    fn split<'a>(f: &'a [u8]) -> impl Iterator<Item = Vec<u8>> + 'a {
+    fn split(f: &[u8]) -> impl Iterator<Item = Vec<u8>> + '_ {
         f.split(|c| *c == 10).map(<[u8]>::to_vec)
     }
 
@@ -97,7 +97,7 @@ pub fn trim_frames(frames: &mut [Vec<u8>; 314]) {
 
         for (j, chunk) in frames
             .iter()
-            .map(|f| {
+            .flat_map(|f| {
                 split(f)
                     .map(|u| {
                         u.iter()
@@ -106,7 +106,6 @@ pub fn trim_frames(frames: &mut [Vec<u8>; 314]) {
                     })
                     .collect::<Vec<_>>()
             })
-            .flatten()
             .collect::<Vec<_>>()
             .chunks(22)
             .enumerate()
@@ -154,7 +153,7 @@ fn verify_stream(mut stream: &TcpStream, uri_path: &str) -> Result<()> {
             Err(UriError::Version(version).into())
         } else if let Some(h) = req
             .headers
-            .into_iter()
+            .iter_mut()
             .take_while(|h| !h.name.is_empty())
             .filter_map(|h| match h.name {
                 "User-Agent" => (!h.value.starts_with(b"curl")).then_some(h),
@@ -182,16 +181,9 @@ pub fn handle_stream(
     // Determine the authenticity of the stream
     verify_stream(&stream, path)?;
 
-    // Check if the stream already exists
-    if streams.contains_key(&port) {
-        // Shutdown the connection
-        stream.shutdown(Shutdown::Both)?;
-        Err(Invalid::DuplicateStream.into())
-    } else {
-        // Setup the client's terminal
-        stream.write_all(&INIT)?;
-        // Add the stream to the map
-        streams.insert(port, stream);
-        Ok(())
-    }
+    // Setup the client's terminal
+    stream.write_all(INIT)?;
+    // Add the stream to the map
+    streams.insert(port, stream);
+    Ok(())
 }

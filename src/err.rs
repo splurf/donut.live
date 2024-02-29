@@ -120,7 +120,7 @@ impl std::fmt::Display for Error {
         f.write_str(&match self {
             Self::IO(e) => e.to_string(),
             Self::Parse(e) => e.to_string(),
-            Self::Sync => "An unexpected poison error has ocurred".to_string(),
+            Self::Sync => "An unexpected poison error has occurred".to_string(),
         })
     }
 }

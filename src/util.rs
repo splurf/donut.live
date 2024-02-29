@@ -1,15 +1,11 @@
 use {
-    crate::{
-        consts::{CHARACTERS, INIT},
-        err::*,
-    },
+    crate::{consts::CHARACTERS, err::*},
     httparse::{Request, EMPTY_HEADER},
     std::{
-        collections::HashMap,
         f32::consts::TAU,
-        io::{Read, Write},
+        io::Read,
         net::TcpStream,
-        sync::RwLockWriteGuard,
+        thread::{spawn, JoinHandle},
     },
     uriparse::Path,
 };
@@ -131,7 +127,7 @@ pub fn trim_frames(frames: &mut [Vec<u8>; 314]) {
 }
 
 /// Verify the potential client by checking if the User-Agent's product is `curl` and a few other practicalities
-fn verify_stream(mut stream: &TcpStream, uri_path: &str) -> Result<()> {
+pub fn verify_stream(mut stream: &TcpStream, uri_path: &str) -> Result<()> {
     // Read from the incoming stream
     let mut buf = [0; 128];
     let bytes = stream.read(&mut buf)?;
@@ -171,19 +167,14 @@ fn verify_stream(mut stream: &TcpStream, uri_path: &str) -> Result<()> {
     }
 }
 
-/// Handler for every potential client
-pub fn handle_stream(
-    mut stream: TcpStream,
-    port: u16,
-    mut streams: RwLockWriteGuard<HashMap<u16, TcpStream>>,
-    path: &str,
-) -> Result<()> {
-    // Determine the authenticity of the stream
-    verify_stream(&stream, path)?;
-
-    // Setup the client's terminal
-    stream.write_all(INIT)?;
-    // Add the stream to the map
-    streams.insert(port, stream);
-    Ok(())
+/// Spawn a new thread that repeatedly calls the provided function.
+pub fn init_handler(mut f: impl FnMut() -> Result<()> + Send + 'static) -> JoinHandle<Result<()>> {
+    spawn(move || -> Result<()> {
+        loop {
+            // call the function
+            if let Err(e) = f() {
+                eprintln!("Error: {}", e)
+            }
+        }
+    })
 }

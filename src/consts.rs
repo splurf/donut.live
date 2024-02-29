@@ -5,7 +5,7 @@ pub const INIT: &[u8] =
     b"HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n\x1b[2J";
 
 /// The delay between each frame
-/// + 20.833333ms => ~48 FPS
+/// - 20.833333ms => ~48 FPS
 pub const DELAY: Duration = Duration::from_nanos(20833333);
 
 /// The characters required to make each donut frame

@@ -5,7 +5,6 @@ use {
     uriparse::Path,
 };
 
-/// A parser containing the configuration for the CLI
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
 pub struct Config {

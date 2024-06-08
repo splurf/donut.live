@@ -6,16 +6,15 @@ license = "MIT"
 repository = "https://github.com/splurf/donut.live"
 authors = ["Evan Schwartzentruber <evandotschwartzentruber@gmail.com>"]
 
+
 [dependencies.clap]
-version = "4.5.1"
+version = "4.5.6"
 default-features = false
-features = ["std", "derive", "help", "color", "usage", "error-context"]
+features = ["std", "derive", "help", "color", "usage", "error-context", "string"]
 
 [dependencies.httparse]
 version = "1.8.0"
 
-[dependencies.uriparse]
-version = "0.6.4"
 
 [profile.release]
 lto = true

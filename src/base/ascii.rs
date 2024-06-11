@@ -1,3 +1,4 @@
+use artem::ConfigBuilder;
 use image::{codecs::gif::GifDecoder, AnimationDecoder, DynamicImage, Frame};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{fs::File, io::BufReader, path::Path, time::Duration};
@@ -27,15 +28,19 @@ impl AsRef<[u8]> for AsciiFrame {
     }
 }
 
-pub fn frame_to_ascii(f: Frame, delay: Option<Duration>) -> AsciiFrame {
+pub fn frame_to_ascii(
+    f: Frame,
+    delay: Option<Duration>,
+    config: &artem::config::Config,
+) -> AsciiFrame {
     // use specified delay or delay of the current frame
     let delay = delay.unwrap_or(f.delay().into());
 
     // represent image buffer as dynamic image
-    let img = DynamicImage::from(f.into_buffer());
+    let image = DynamicImage::from(f.into_buffer());
 
     // convert image into ASCII art
-    let s = artem::convert(img, &Default::default());
+    let s = artem::convert(image, config);
 
     // prepend HOME ASCII escape sequence
     let mut buffer = b"\x1b[H".to_vec();
@@ -45,7 +50,11 @@ pub fn frame_to_ascii(f: Frame, delay: Option<Duration>) -> AsciiFrame {
     AsciiFrame { buffer, delay }
 }
 
-fn get_frames_from_path(path: &Path, fps: Option<f32>) -> Result<Vec<AsciiFrame>> {
+fn get_frames_from_path(
+    path: &Path,
+    fps: Option<f32>,
+    is_colored: bool,
+) -> Result<Vec<AsciiFrame>> {
     // file reader
     let input = BufReader::new(File::open(path)?);
 
@@ -56,11 +65,12 @@ fn get_frames_from_path(path: &Path, fps: Option<f32>) -> Result<Vec<AsciiFrame>
     let frames = decoder.into_frames().collect_frames().unwrap();
 
     let delay = fps.map(|value| Duration::from_secs_f32(1.0 / value));
+    let config = ConfigBuilder::new().color(is_colored).build();
 
     // convert frame buffer to ASCII, extract buffer and delay only
     let ascii = frames
         .into_par_iter()
-        .map(|f| frame_to_ascii(f, delay))
+        .map(|f| frame_to_ascii(f, delay, &config))
         .collect::<Vec<AsciiFrame>>();
 
     if ascii.iter().all(|f| f.delay().is_zero()) {
@@ -71,7 +81,7 @@ fn get_frames_from_path(path: &Path, fps: Option<f32>) -> Result<Vec<AsciiFrame>
 
 pub fn get_frames(cfg: &Config) -> Result<Vec<AsciiFrame>> {
     if let Some(path) = cfg.images() {
-        get_frames_from_path(path, cfg.fps())
+        get_frames_from_path(path, cfg.fps(), cfg.is_colored())
     } else {
         Ok(donut::get_frames())
     }

@@ -35,6 +35,9 @@ pub struct Config {
 
     #[arg(short, long)]
     fps: Option<f32>,
+
+    #[arg(short, long)]
+    is_colored: bool,
 }
 
 impl Config {
@@ -63,5 +66,9 @@ impl Config {
     /// Return the frames/second, if specified.
     pub const fn fps(&self) -> Option<f32> {
         self.fps
+    }
+
+    pub const fn is_colored(&self) -> bool {
+        self.is_colored
     }
 }

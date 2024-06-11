@@ -26,18 +26,21 @@ pub struct Config {
     #[arg(short, long, default_value_t = 8080)]
     port: u16,
 
-    /// Location path
+    /// URI location path
     #[arg(long, default_value_t = String::from('/'), value_parser = parse_path)]
     path: String,
 
+    /// Custom provided GIF
     #[arg(short, long)]
-    images: Option<PathBuf>,
+    gif: Option<PathBuf>,
 
+    /// Custom Frames/sec
     #[arg(short, long)]
     fps: Option<f32>,
 
+    /// Enable/Disable color
     #[arg(short, long)]
-    is_colored: bool,
+    colored: bool,
 }
 
 impl Config {
@@ -59,8 +62,8 @@ impl Config {
     }
 
     /// Return the path to the images.
-    pub fn images(&self) -> Option<&Path> {
-        self.images.as_deref()
+    pub fn gif(&self) -> Option<&Path> {
+        self.gif.as_deref()
     }
 
     /// Return the frames/second, if specified.
@@ -68,7 +71,7 @@ impl Config {
         self.fps
     }
 
-    pub const fn is_colored(&self) -> bool {
-        self.is_colored
+    pub const fn colored(&self) -> bool {
+        self.colored
     }
 }

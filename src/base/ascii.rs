@@ -80,8 +80,8 @@ fn get_frames_from_path(
 }
 
 pub fn get_frames(cfg: &Config) -> Result<Vec<AsciiFrame>> {
-    if let Some(path) = cfg.images() {
-        get_frames_from_path(path, cfg.fps(), cfg.is_colored())
+    if let Some(path) = cfg.gif() {
+        get_frames_from_path(path, cfg.fps(), cfg.colored())
     } else {
         Ok(donut::get_frames())
     }

@@ -30,8 +30,27 @@ impl std::fmt::Display for UriError {
     }
 }
 
+pub enum GifError {
+    Delay,
+}
+
+impl std::fmt::Display for GifError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Delay => "GIF (missing frame rate)",
+        })
+    }
+}
+
+impl From<GifError> for Invalid {
+    fn from(value: GifError) -> Self {
+        Self::Gif(value)
+    }
+}
+
 pub enum Invalid {
     Uri(UriError),
+    Gif(GifError),
     Format,
 }
 
@@ -41,6 +60,7 @@ impl std::fmt::Display for Invalid {
             "Invalid {}",
             match self {
                 Self::Uri(e) => e.to_string(),
+                Self::Gif(e) => e.to_string(),
                 Self::Format => "http format".to_string(),
             }
         ))
@@ -62,6 +82,7 @@ impl From<UriError> for Invalid {
 pub enum Error {
     IO(std::io::Error),
     Parse(Invalid),
+    Gif(image::ImageError),
     Sync,
 }
 
@@ -74,6 +95,12 @@ impl From<std::io::Error> for Error {
 impl<T: Into<Invalid>> From<T> for Error {
     fn from(value: T) -> Self {
         Self::Parse(value.into())
+    }
+}
+
+impl From<image::ImageError> for Error {
+    fn from(value: image::ImageError) -> Self {
+        Self::Gif(value)
     }
 }
 
@@ -112,6 +139,7 @@ impl std::fmt::Display for Error {
         f.write_str(&match self {
             Self::IO(e) => e.to_string(),
             Self::Parse(e) => e.to_string(),
+            Self::Gif(e) => e.to_string(),
             Self::Sync => "An unexpected poison error has occurred".to_string(),
         })
     }

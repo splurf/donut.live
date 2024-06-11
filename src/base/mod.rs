@@ -1,15 +1,15 @@
+mod ascii;
 mod cfg;
-mod consts;
+mod donut;
 mod err;
 mod sync;
 mod utils;
 
-use consts::*;
-use sync::*;
-use utils::*;
-
+pub use ascii::*;
 pub use cfg::*;
 pub use err::*;
+pub use sync::*;
+pub use utils::*;
 
 use std::{
     collections::HashMap,
@@ -18,8 +18,11 @@ use std::{
     thread::{sleep, JoinHandle},
 };
 
+/// The initial HTTP response headers appended with the `ESC[2J` erase function
+const INIT: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n\x1b[2J";
+
 /// Automatically remove any disconnected clients.
-fn error_handler(
+pub fn error_handler(
     streams: CondLock<HashMap<SocketAddr, TcpStream>>,
     disconnected: CondLock<Vec<SocketAddr>>,
 ) -> JoinHandle<Result<()>> {
@@ -49,7 +52,7 @@ fn error_handler(
 }
 
 /// Validate and instantiate streams into the system.
-fn incoming_handler(
+pub fn incoming_handler(
     server: TcpListener,
     streams: CondLock<HashMap<SocketAddr, TcpStream>>,
     path: &str,
@@ -77,10 +80,10 @@ fn incoming_handler(
 }
 
 /// Distribute each frame to every stream.
-fn dist_handler(
+pub fn dist_handler(
     streams: &CondLock<HashMap<SocketAddr, TcpStream>>,
     disconnected: &CondLock<Vec<SocketAddr>>,
-    frames: &[Vec<u8>],
+    frames: &[AsciiFrame],
 ) -> Result<()> {
     // wait if and only if there are no connections
     streams.wait()?;
@@ -104,7 +107,7 @@ fn dist_handler(
             // send each stream the current frame
             for (ip, mut stream) in streams.read()?.iter() {
                 // remove the client if they have disconnected
-                if stream.write_all(frame).is_err() {
+                if stream.write_all(frame.as_ref()).is_err() {
                     g.push(*ip);
                 }
             }
@@ -117,37 +120,8 @@ fn dist_handler(
             *disconnected.lock()? = true;
             disconnected.notify();
         }
-
-        // the pause between each frame
-        sleep(DELAY)
+        // the delay of the current frame
+        sleep(frame.delay())
     }
     Ok(())
-}
-
-/// Inititate program.
-pub fn init() -> Result<()> {
-    // parse program arguments
-    let cfg = Config::new();
-
-    // init listener
-    let server = TcpListener::bind(cfg.addr())?;
-
-    // connected clients
-    let streams = CondLock::default();
-
-    // disconnected clients
-    let disconnected = CondLock::default();
-
-    // init handlers
-    error_handler(streams.clone(), disconnected.clone());
-    incoming_handler(server, streams.clone(), cfg.path());
-
-    // obtain frames
-    let frames = donuts();
-
-    println!("Listening @ http://{}{}\n", cfg.addr(), cfg.path());
-
-    // Distribute frames to each client as long as there is at least one connection.
-    // Otherwise, the thread remains paused.
-    loop_func(move || dist_handler(&streams, &disconnected, &frames))
 }

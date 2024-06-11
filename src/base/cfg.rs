@@ -1,5 +1,8 @@
 use clap::Parser;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
+    path::{Path, PathBuf},
+};
 
 use super::Result;
 
@@ -24,8 +27,14 @@ pub struct Config {
     port: u16,
 
     /// Location path
-    #[arg(long, default_value = String::from('/'), value_parser = parse_path)]
+    #[arg(long, default_value_t = String::from('/'), value_parser = parse_path)]
     path: String,
+
+    #[arg(short, long)]
+    images: Option<PathBuf>,
+
+    #[arg(short, long)]
+    fps: Option<f32>,
 }
 
 impl Config {
@@ -41,8 +50,18 @@ impl Config {
         }
     }
 
-    /// Return the `path` of the address
+    /// Return the URI path
     pub fn path(&self) -> &str {
         &self.path
+    }
+
+    /// Return the path to the images.
+    pub fn images(&self) -> Option<&Path> {
+        self.images.as_deref()
+    }
+
+    /// Return the frames/second, if specified.
+    pub const fn fps(&self) -> Option<f32> {
+        self.fps
     }
 }

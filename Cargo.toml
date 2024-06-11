@@ -2,18 +2,21 @@
 name = "donut-live"
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
-repository = "https://github.com/splurf/donut.live"
-authors = ["Evan Schwartzentruber <evandotschwartzentruber@gmail.com>"]
 
 
-[dependencies.clap]
-version = "4.5.6"
-default-features = false
-features = ["std", "derive", "help", "color", "usage", "error-context", "string"]
-
-[dependencies.httparse]
-version = "1.8.0"
+[dependencies]
+clap = { version = "4.5.7", default-features = false, features = [
+    "std",
+    "derive",
+    "help",
+    "color",
+    "usage",
+    "error-context",
+] }
+httparse = "1.9.2"
+artem = "3.0.0"
+image = { version = "0.25.1", default-features = false, features = ["rayon", "gif"] }
+rayon = "1.10.0"
 
 
 [profile.release]

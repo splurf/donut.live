@@ -80,48 +80,65 @@ pub fn incoming_handler(
 }
 
 /// Distribute each frame to every stream.
+pub fn _dist_handler(
+    streams: &CondLock<HashMap<SocketAddr, TcpStream>>,
+    disconnected: &CondLock<Vec<SocketAddr>>,
+    frame: &AsciiFrame,
+) -> Result<()> {
+    // discontinue distributing frames and pause
+    // this thread if there are no connections
+    if !*streams.lock()? {
+        return Err(Error::Empty);
+    }
+
+    // the number of disconnections
+    let res = {
+        // acquire the writing guard of `disconnected`.
+        // This doesn't cause a deadlock because `disconnected` is
+        // only ever externally accessed after the end of this scope,
+        // which is covered as this guard gets automatically dropped
+        let mut g = disconnected.write()?;
+
+        // send each stream the current frame
+        for (ip, mut stream) in streams.read()?.iter() {
+            // remove the client if they have disconnected
+            if stream.write_all(frame.as_ref()).is_err() {
+                g.push(*ip);
+            }
+        }
+        // determinant for whether there have been any disconnections
+        g.len() > 0
+    };
+
+    // notify `disconnected` due to a disconnection
+    if res {
+        *disconnected.lock()? = true;
+        disconnected.notify();
+    }
+    Ok(())
+}
+
+/// Distribute each frame to every stream.
 pub fn dist_handler(
     streams: &CondLock<HashMap<SocketAddr, TcpStream>>,
     disconnected: &CondLock<Vec<SocketAddr>>,
     frames: &[AsciiFrame],
+    frame_index: &mut usize,
 ) -> Result<()> {
-    // wait if and only if there are no connections
+    // wait until there's at least one connection
     streams.wait()?;
 
     // distribute the frames to each client
-    for frame in frames {
-        // discontinue distributing frames and pause
-        // this thread if there are no connections
-        if !*streams.lock()? {
-            break;
-        }
-
-        // the number of disconnections
-        let res = {
-            // acquire the writing guard of `disconnected`.
-            // This doesn't cause a deadlock because `disconnected` is
-            // only ever externally accessed after the end of this scope,
-            // which is covered as this guard gets automatically dropped
-            let mut g = disconnected.write()?;
-
-            // send each stream the current frame
-            for (ip, mut stream) in streams.read()?.iter() {
-                // remove the client if they have disconnected
-                if stream.write_all(frame.as_ref()).is_err() {
-                    g.push(*ip);
-                }
-            }
-            // determinant for whether there have been any disconnections
-            g.len() > 0
-        };
-
-        // notify `disconnected` due to a disconnection
-        if res {
-            *disconnected.lock()? = true;
-            disconnected.notify();
+    for (i, frame) in frames.iter().enumerate().skip(*frame_index) {
+        println!("{}", i);
+        if let Err(e) = _dist_handler(streams, disconnected, frame) {
+            *frame_index = i;
+            return Err(e);
         }
         // the delay of the current frame
         sleep(frame.delay())
     }
+    // reset frame index
+    *frame_index = 0;
     Ok(())
 }

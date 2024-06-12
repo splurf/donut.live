@@ -83,6 +83,7 @@ pub enum Error {
     IO(std::io::Error),
     Parse(Invalid),
     Gif(image::ImageError),
+    Empty,
     Sync,
 }
 
@@ -140,6 +141,7 @@ impl std::fmt::Display for Error {
             Self::IO(e) => e.to_string(),
             Self::Parse(e) => e.to_string(),
             Self::Gif(e) => e.to_string(),
+            Self::Empty => "The server is empty. Entering idle mode.".to_string(),
             Self::Sync => "An unexpected poison error has occurred".to_string(),
         })
     }

@@ -25,7 +25,13 @@ fn main() -> Result<()> {
 
     println!("Listening @ http://{}{}\n", cfg.addr(), cfg.path());
 
+    // global frame index
+    let mut frame_index = 0;
+
     // Distribute frames to each client as long as there is at least one connection.
     // Otherwise, the thread remains paused.
-    loop_func(move || dist_handler(&streams, &disconnected, &frames))
+    loop_func(move || {
+        // update frame index after every iteration
+        dist_handler(&streams, &disconnected, &frames, &mut frame_index)
+    })
 }

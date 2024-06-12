@@ -13,7 +13,7 @@ clap = { version = "4.5.7", default-features = false, features = [
     "usage",
     "error-context",
 ] }
-httparse = "1.9.2"
+httparse = "1.9.3"
 artem = "3.0.0"
 image = { version = "0.25.1", default-features = false, features = ["rayon", "gif"] }
 rayon = "1.10.0"

@@ -130,7 +130,6 @@ pub fn dist_handler(
 
     // distribute the frames to each client
     for (i, frame) in frames.iter().enumerate().skip(*frame_index) {
-        println!("{}", i);
         if let Err(e) = _dist_handler(streams, disconnected, frame) {
             *frame_index = i;
             return Err(e);

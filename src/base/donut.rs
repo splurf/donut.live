@@ -1,6 +1,6 @@
 use std::{f32::consts::TAU, time::Duration};
 
-use crate::AsciiFrame;
+use super::AsciiFrame;
 
 /// The delay between each frame
 /// - 20.833333ms => ~48 FPS

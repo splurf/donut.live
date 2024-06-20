@@ -3,8 +3,7 @@ use image::{codecs::gif::GifDecoder, AnimationDecoder, DynamicImage, Frame};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use std::{fs::File, io::BufReader, path::Path, time::Duration};
 
-use super::donut;
-use crate::{Config, GifError, Result};
+use super::{donut, Config, GifError, Result};
 
 #[derive(Clone, Debug)]
 pub struct AsciiFrame {

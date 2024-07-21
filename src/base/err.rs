@@ -85,6 +85,7 @@ pub enum Error {
     Gif(image::ImageError),
     Empty,
     Sync,
+    File,
 }
 
 impl From<std::io::Error> for Error {
@@ -143,6 +144,7 @@ impl std::fmt::Display for Error {
             Self::Gif(e) => e.to_string(),
             Self::Empty => "The server is empty. Entering idle mode.".to_string(),
             Self::Sync => "An unexpected poison error has occurred".to_string(),
+            Self::File => "Failed to parse expected '.ascii' or '.asciic' file".to_string(),
         })
     }
 }

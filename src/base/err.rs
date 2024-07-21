@@ -83,9 +83,9 @@ pub enum Error {
     IO(std::io::Error),
     Parse(Invalid),
     Gif(image::ImageError),
+    Json(bincode::Error),
     Empty,
     Sync,
-    File,
 }
 
 impl From<std::io::Error> for Error {
@@ -124,6 +124,12 @@ impl<T> From<std::sync::PoisonError<std::sync::MutexGuard<'_, T>>> for Error {
     }
 }
 
+impl From<bincode::Error> for Error {
+    fn from(value: bincode::Error) -> Self {
+        Self::Json(value)
+    }
+}
+
 impl From<Box<dyn std::any::Any + Send>> for Error {
     fn from(_: Box<dyn std::any::Any + Send>) -> Self {
         Self::Sync
@@ -142,9 +148,9 @@ impl std::fmt::Display for Error {
             Self::IO(e) => e.to_string(),
             Self::Parse(e) => e.to_string(),
             Self::Gif(e) => e.to_string(),
+            Self::Json(e) => e.to_string(),
             Self::Empty => "The server is empty. Entering idle mode.".to_string(),
             Self::Sync => "An unexpected poison error has occurred".to_string(),
-            Self::File => "Failed to parse expected '.ascii' or '.asciic' file".to_string(),
         })
     }
 }

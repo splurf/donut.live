@@ -123,6 +123,5 @@ fn trim_frames(frames: &mut [Vec<u8>; 314]) {
             .map(|(i, l)| l[0..maxes[i]].to_vec())
             .collect::<Vec<Vec<u8>>>()
             .join(&10);
-        f.splice(0..0, "\x1b[H".bytes());
     });
 }

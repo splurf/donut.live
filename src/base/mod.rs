@@ -3,13 +3,13 @@ mod cfg;
 mod donut;
 mod err;
 mod sync;
-mod utils;
+mod util;
 
 pub use ascii::*;
 pub use cfg::*;
 pub use err::*;
 pub use sync::*;
-pub use utils::*;
+pub use util::*;
 
 use std::{
     collections::HashMap,

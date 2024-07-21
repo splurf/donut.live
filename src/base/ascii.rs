@@ -1,18 +1,19 @@
 use artem::ConfigBuilder;
+use bincode::{deserialize, serialize};
 use image::{
     codecs::gif::GifDecoder, imageops::FilterType, AnimationDecoder, DynamicImage, Frame,
     ImageDecoder,
 };
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use serde::{Deserialize, Serialize};
 use std::{
     fs::{read, File},
     io::{BufReader, Write},
     path::Path,
     time::Duration,
-    vec::IntoIter,
 };
 
-use super::{donut, Config, Error, GifError, Result};
+use super::{donut, Config, GifError, Result};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Dimensions {
@@ -30,16 +31,7 @@ impl Dimensions {
     }
 }
 
-fn read_buf<const N: usize>(iter: &mut IntoIter<u8>) -> Option<[u8; N]> {
-    let mut buf = [0; N];
-    for byte in buf.iter_mut() {
-        *byte = iter.next()?
-    }
-    Some(buf)
-}
-
-#[repr(C)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AsciiFrame {
     buffer: Vec<u8>,
     delay: Duration,
@@ -52,38 +44,6 @@ impl AsciiFrame {
 
     pub const fn delay(&self) -> Duration {
         self.delay
-    }
-
-    pub fn into_bytes(self) -> Vec<u8> {
-        // buffer length as a 'usize'
-        let buffer_len = self.buffer.len();
-
-        // duration as milliseconds as a 'u64'
-        let millis = self.delay.as_millis() as u64;
-
-        // frame buffer => [<LENGTH [usize]>, <DELAY [u64]>, <RAW_BUFFER [u8; LENGTH]>]
-        let mut data = Vec::with_capacity(size_of::<usize>() + size_of::<u64>() + buffer_len);
-
-        // put it all together
-        data.extend(buffer_len.to_ne_bytes());
-        data.extend(millis.to_ne_bytes());
-        data.extend(self.buffer);
-
-        data
-    }
-
-    pub fn from_bytes(iter: &mut IntoIter<u8>) -> Option<Self> {
-        // deserialize buffer length as 'usize'
-        let buffer_len = usize::from_ne_bytes(read_buf::<{ size_of::<usize>() }>(iter)?);
-
-        // deserialize duration as milliseconds as a 'u64'
-        let millis = u64::from_ne_bytes(read_buf::<{ size_of::<u64>() }>(iter)?);
-
-        // read frame buffer based on provided length
-        let buffer = iter.take(buffer_len).collect();
-
-        // construct frame
-        Some(Self::new(buffer, Duration::from_millis(millis)))
     }
 }
 
@@ -163,22 +123,11 @@ pub fn read_file(file_name: &str) -> Result<Vec<AsciiFrame>> {
     // read contents of file
     let bytes = read(file_name)?;
 
-    // consuming iterator for file contents
-    let mut iter = bytes.into_iter();
-
-    // number of frames
-    let len =
-        usize::from_ne_bytes(read_buf::<{ size_of::<usize>() }>(&mut iter).ok_or(Error::File)?);
-
-    // read frame by frame
-    let mut frames = Vec::with_capacity(len);
-    for _ in 0..len {
-        // deserialize frame
-        let mut frame = AsciiFrame::from_bytes(&mut iter).ok_or(Error::File)?;
-
+    // deserialize each frame
+    let mut frames = deserialize::<Vec<AsciiFrame>>(&bytes)?;
+    for frame in frames.iter_mut() {
         // preprend home ascii escape sequence to each frame buffer
         frame.buffer.splice(0..0, "\x1b[H".bytes());
-        frames.push(frame)
     }
     Ok(frames)
 }
@@ -196,14 +145,7 @@ pub fn write_file(
         donut::get_frames() // default
     };
 
-    // serialize frames beginning with number of frames
-    let mut bytes = frames.len().to_ne_bytes().to_vec();
-    bytes.extend(
-        frames
-            .into_iter()
-            .flat_map(|f| f.into_bytes())
-            .collect::<Vec<u8>>(),
-    );
+    let bytes = serialize(&frames)?;
 
     // write to file
     let mut file = File::create(file_name)?;

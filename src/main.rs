@@ -8,6 +8,7 @@ fn main() -> Result<()> {
     // parse program arguments
     let cfg = Config::new();
 
+    // retrieve ascii frames
     let frames = get_frames(&cfg)?;
 
     // init listener

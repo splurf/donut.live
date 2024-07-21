@@ -56,22 +56,46 @@ impl Config {
         }
     }
 
-    /// Return the URI path
+    /// URI path
     pub fn path(&self) -> &str {
         &self.path
     }
 
-    /// Return the path to the images.
+    /// Path to the images.
     pub fn gif(&self) -> Option<&Path> {
         self.gif.as_deref()
     }
 
-    /// Return the frames/second, if specified.
+    /// Frames/second, if specified.
     pub const fn fps(&self) -> Option<f32> {
         self.fps
     }
 
-    pub const fn colored(&self) -> bool {
+    /// Determinant for whether the gif will be is_colored or not.
+    pub const fn is_colored(&self) -> bool {
         self.colored
+    }
+
+    /// The file stem of the ascii-generated file.
+    fn file_stem(&self) -> &str {
+        self.gif()
+            .map(|p| {
+                p.file_stem()
+                    .map(|s| s.to_str().unwrap_or("_"))
+                    .unwrap_or("_")
+            })
+            .unwrap_or("donuts")
+    }
+
+    /// The file name of the ascii-generated file.
+    pub fn file_name(&self) -> String {
+        // '.ascii' default extension
+        let mut s = format!("{}.ascii", self.file_stem());
+
+        // '.asciic' extension indicates colored ascii
+        if self.is_colored() {
+            s.push('c')
+        }
+        s
     }
 }

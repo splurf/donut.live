@@ -4,14 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-clap = { version = "4.5.9", default-features = false, features = [
-    "std",
-    "derive",
-    "help",
-    "color",
-    "usage",
-    "error-context",
-] }
+clap = { version = "4.5.9", features = ["derive"] }
 httparse = "1.9.4"
 artem = "3.0.0"
 image = { version = "0.25.1", default-features = false, features = [

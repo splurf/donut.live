@@ -41,4 +41,4 @@ Options:
 + This works for terminals that support [ANSI Escape Sequences](https://en.wikipedia.org/wiki/ANSI_escape_code).
 
 ## Credit
-+ The [gen_frame](https://github.com/splurf/donut.live/blob/4f13c1280d9ead28b1fb40d0d3f0d52429487958/src/base/donut.rs#L13) function within `utils.rs` heavily references the original [donut.c](https://www.a1k0n.net/2011/07/20/donut-math.html) script.
++ The [gen_frame](https://github.com/splurf/donut.live/blob/4f13c1280d9ead28b1fb40d0d3f0d52429487958/src/base/donut.rs#L13) function within `util.rs` heavily references the original [donut.c](https://www.a1k0n.net/2011/07/20/donut-math.html) script.

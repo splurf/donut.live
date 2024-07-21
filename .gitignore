@@ -1,4 +1,11 @@
+# directories
 /donuts
 /parrots
 /target
+
+# generated files
+*.ascii
+*.asciic
+
+# misc
 .vscode

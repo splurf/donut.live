@@ -6,14 +6,15 @@ edition = "2021"
 [dependencies]
 artem = "3.0.0"
 bincode = "1.3.3"
-clap = { version = "4.5.9", features = ["derive"] }
+clap = { version = "4.5.11", features = ["derive"] }
 httparse = "1.9.4"
-image = { version = "0.25.1", default-features = false, features = [
+image = { version = "0.25.2", default-features = false, features = [
     "rayon",
     "gif",
 ] }
 rayon = "1.10.0"
 serde = { version = "1.0.204", features = ["derive"] }
+zstd = "0.13.2"
 
 [profile.release]
 lto = true

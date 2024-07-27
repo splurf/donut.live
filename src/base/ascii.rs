@@ -8,14 +8,11 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{read, File},
-    io::{BufReader, Cursor},
+    io::BufReader,
     path::Path,
     time::Duration,
 };
-use zstd::{
-    stream::{copy_decode, copy_encode},
-    zstd_safe::max_c_level,
-};
+use zstd::{decode_all, stream::copy_encode, zstd_safe::max_c_level};
 
 use super::{donut, Config, GifError, Result};
 
@@ -37,6 +34,7 @@ impl Dimensions {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AsciiFrame {
+    #[serde(with = "serde_bytes")]
     buffer: Vec<u8>,
     delay: Duration,
 }
@@ -128,12 +126,10 @@ pub fn read_file(file_name: &str) -> Result<Vec<AsciiFrame>> {
     let src = read(file_name)?;
 
     // decompress contents
-    let mut dst = Vec::new();
-    copy_decode(Cursor::new(src), &mut dst)?;
+    let decompressed = decode_all(src.as_slice())?;
 
     // deserialize each frame
-    let frames = deserialize::<Vec<AsciiFrame>>(&dst)?;
-    Ok(frames)
+    deserialize(&decompressed).map_err(Into::into)
 }
 
 pub fn write_file(
@@ -151,11 +147,11 @@ pub fn write_file(
     // serialize to bytes
     let src = serialize(&frames.clone())?;
 
-    // write serialization while compressing
-    let file = File::create(file_name)?;
-    copy_encode(Cursor::new(src), file, max_c_level())?;
+    // write to file while compressing serialization
+    let dst = File::create(file_name)?;
+    copy_encode(src.as_slice(), dst, max_c_level())?;
 
-    // return originally generated frames
+    // return the generated frames
     Ok(frames)
 }
 
@@ -169,8 +165,8 @@ pub fn get_frames(cfg: &Config) -> Result<Vec<AsciiFrame>> {
         write_file(cfg.gif(), cfg.fps(), cfg.is_colored(), &file_name)
     })?;
 
+    // preprend home ascii escape sequence to each frame buffer
     for frame in frames.iter_mut() {
-        // preprend home ascii escape sequence to each frame buffer
         frame.buffer.splice(0..0, "\x1b[H".bytes());
     }
     Ok(frames)

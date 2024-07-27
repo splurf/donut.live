@@ -8,9 +8,13 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{read, File},
-    io::{BufReader, Write},
+    io::{BufReader, Cursor},
     path::Path,
     time::Duration,
+};
+use zstd::{
+    stream::{copy_decode, copy_encode},
+    zstd_safe::max_c_level,
 };
 
 use super::{donut, Config, GifError, Result};
@@ -121,14 +125,14 @@ fn get_frames_from_path(
 
 pub fn read_file(file_name: &str) -> Result<Vec<AsciiFrame>> {
     // read contents of file
-    let bytes = read(file_name)?;
+    let src = read(file_name)?;
+
+    // decompress contents
+    let mut dst = Vec::new();
+    copy_decode(Cursor::new(src), &mut dst)?;
 
     // deserialize each frame
-    let mut frames = deserialize::<Vec<AsciiFrame>>(&bytes)?;
-    for frame in frames.iter_mut() {
-        // preprend home ascii escape sequence to each frame buffer
-        frame.buffer.splice(0..0, "\x1b[H".bytes());
-    }
+    let frames = deserialize::<Vec<AsciiFrame>>(&dst)?;
     Ok(frames)
 }
 
@@ -137,19 +141,22 @@ pub fn write_file(
     fps: Option<f32>,
     is_colored: bool,
     file_name: &str,
-) -> Result<()> {
+) -> Result<Vec<AsciiFrame>> {
     // generate frames
     let frames = if let Some(path) = gif {
         get_frames_from_path(path, fps, is_colored)?
     } else {
         donut::get_frames() // default
     };
+    // serialize to bytes
+    let src = serialize(&frames.clone())?;
 
-    let bytes = serialize(&frames)?;
+    // write serialization while compressing
+    let file = File::create(file_name)?;
+    copy_encode(Cursor::new(src), file, max_c_level())?;
 
-    // write to file
-    let mut file = File::create(file_name)?;
-    file.write_all(&bytes).map_err(Into::into)
+    // return originally generated frames
+    Ok(frames)
 }
 
 pub fn get_frames(cfg: &Config) -> Result<Vec<AsciiFrame>> {
@@ -157,13 +164,14 @@ pub fn get_frames(cfg: &Config) -> Result<Vec<AsciiFrame>> {
     let file_name = cfg.file_name();
 
     // generate and write frames to file if they don't already exist
-    read_file(&file_name)
-        .or_else(|_| {
-            // save to file
-            write_file(cfg.gif(), cfg.fps(), cfg.is_colored(), &file_name)?;
+    let mut frames = read_file(&file_name).or_else(|_| {
+        // save to file, while returning original result
+        write_file(cfg.gif(), cfg.fps(), cfg.is_colored(), &file_name)
+    })?;
 
-            // reread from file
-            read_file(&file_name)
-        })
-        .map_err(Into::into)
+    for frame in frames.iter_mut() {
+        // preprend home ascii escape sequence to each frame buffer
+        frame.buffer.splice(0..0, "\x1b[H".bytes());
+    }
+    Ok(frames)
 }

@@ -1,7 +1,11 @@
 use clap::Parser;
+use log::Level;
 use std::{
+    env::{set_var, var},
     net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
+    ops::Deref,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 use super::Result;
@@ -17,7 +21,7 @@ fn parse_path(s: &str) -> Result<String> {
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
-pub struct Config {
+pub struct InitConfig {
     /// IP address
     #[arg(short, long, default_value_t = IpAddr::V4(Ipv4Addr::LOCALHOST))]
     addr: IpAddr,
@@ -43,11 +47,7 @@ pub struct Config {
     colored: bool,
 }
 
-impl Config {
-    pub fn new() -> Self {
-        Self::parse()
-    }
-
+impl InitConfig {
     /// Construct a [`SocketAddr`] from the `addr` and `port` attributes
     pub const fn addr(&self) -> SocketAddr {
         match self.addr {
@@ -75,27 +75,69 @@ impl Config {
     pub const fn is_colored(&self) -> bool {
         self.colored
     }
+}
 
-    /// The file stem of the ascii-generated file.
-    fn file_stem(&self) -> &str {
-        self.gif()
+pub struct Config {
+    init: InitConfig,
+    file_name: String,
+    log_level: Level,
+}
+
+impl Config {
+    pub fn new() -> Result<Self> {
+        let init = InitConfig::parse();
+
+        // ensure valid log level (default: 'info')
+        let log_level = Level::from_str(&var("RUST_LOG").unwrap_or_else(|_| "info".to_string()))?;
+
+        // ensure intended log level
+        set_var("RUST_LOG", format!("{},artem=warn", log_level));
+
+        // the new file stem of the ascii-generated file
+        let file_stem = init
+            .gif()
             .map(|p| {
                 p.file_stem()
                     .map(|s| s.to_str().unwrap_or("_"))
                     .unwrap_or("_")
             })
-            .unwrap_or("donuts")
+            .unwrap_or("donuts");
+
+        // the new file name of the ascii-generated file
+        let file_name = {
+            // '.ascii' default extension
+            let mut s = format!("{}.ascii", file_stem);
+
+            // '.asciic' extension indicates colored ascii
+            if init.is_colored() {
+                s.push('c')
+            }
+            s
+        };
+
+        // init logger
+        env_logger::init();
+
+        Ok(Self {
+            init,
+            file_name,
+            log_level,
+        })
     }
 
-    /// The file name of the ascii-generated file.
-    pub fn file_name(&self) -> String {
-        // '.ascii' default extension
-        let mut s = format!("{}.ascii", self.file_stem());
+    pub fn file_name(&self) -> &str {
+        &self.file_name
+    }
 
-        // '.asciic' extension indicates colored ascii
-        if self.is_colored() {
-            s.push('c')
-        }
-        s
+    pub const fn log_level(&self) -> Level {
+        self.log_level
+    }
+}
+
+impl Deref for Config {
+    type Target = InitConfig;
+
+    fn deref(&self) -> &Self::Target {
+        &self.init
     }
 }

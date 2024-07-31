@@ -1,36 +1,22 @@
 use artem::ConfigBuilder;
 use bincode::{deserialize, serialize};
+use gif::DecodeOptions;
 use image::{
-    codecs::gif::GifDecoder, imageops::FilterType, AnimationDecoder, DynamicImage, Frame,
-    ImageDecoder,
+    codecs::gif::GifDecoder, imageops::FilterType, AnimationDecoder, DynamicImage, ImageDecoder,
 };
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use indicatif::{ParallelProgressIterator, ProgressIterator};
+use log::info;
+use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{read, File},
-    io::BufReader,
+    io::{BufReader, BufWriter, Read, Seek, SeekFrom},
     path::Path,
     time::Duration,
 };
 use zstd::{decode_all, stream::copy_encode, zstd_safe::max_c_level};
 
 use super::{donut, Config, GifError, Result};
-
-#[derive(Clone, Copy, Debug)]
-pub struct Dimensions {
-    width: u32,
-    height: u32,
-}
-
-impl Dimensions {
-    const fn w(&self) -> u32 {
-        self.width
-    }
-
-    const fn h(&self) -> u32 {
-        self.height
-    }
-}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AsciiFrame {
@@ -55,21 +41,23 @@ impl AsRef<[u8]> for AsciiFrame {
     }
 }
 
-pub fn frame_to_ascii(
-    f: Frame,
+fn frame_to_ascii(
+    f: image::Frame,
     delay: Option<Duration>,
-    dims: Option<Dimensions>,
+    dims: Option<(u32, u32)>,
     config: &artem::config::Config,
 ) -> AsciiFrame {
     // use specified delay or delay of the current frame
+    // let delay = delay.unwrap_or(Duration::from_millis(f.delay.into()));
     let delay = delay.unwrap_or(f.delay().into());
 
     // represent image buffer as dynamic image
     let mut image = DynamicImage::from(f.into_buffer());
 
-    if let Some(dims) = dims {
+    // resize if needed
+    if let Some((w, h)) = dims {
         // resize image dimensions based on provided dimensions
-        image = image.resize_exact(dims.w(), dims.h(), FilterType::Nearest);
+        image = image.resize_exact(w, h, FilterType::Nearest);
     }
 
     // convert image into ASCII art
@@ -82,53 +70,104 @@ pub fn frame_to_ascii(
     }
 }
 
+fn get_frames_count(input: &mut BufReader<File>) -> Result<u64> {
+    // decoder configuration
+    let mut options = DecodeOptions::new();
+
+    info!("Counting frames");
+    // determine number of frames
+    options.skip_frame_decoding(true);
+    let mut count = 0;
+
+    // iterate through frames without decoding
+    let mut decoder = options.read_info(input.by_ref())?;
+
+    // count each image
+    (0..)
+        .try_for_each(|_| decoder.next_frame_info().ok()?.map(|_| count += 1))
+        .into_par_iter();
+    info!("Number of frames: {}", count);
+
+    Ok(count)
+}
+
+fn get_ascii_frames(
+    input: BufReader<File>,
+    fps: Option<f32>,
+    is_colored: bool,
+    count: u64,
+) -> Result<Vec<AsciiFrame>> {
+    // init 'image' decoder
+    let decoder = GifDecoder::new(input)?;
+
+    // determine delay between each frame
+    let delay = fps.map(|value| Duration::from_secs_f32(1.0 / value));
+
+    // regulate then clamp dimensions
+    let dims = {
+        let (w, h) = decoder.dimensions();
+        (h > 56).then_some(((w as f32 * (56.0 / h as f32)) as u32, 56))
+    };
+
+    // provide the color determinant
+    let config = ConfigBuilder::new().color(is_colored).build();
+
+    info!("Decoding frames");
+    // decode frames
+    let frames = decoder
+        .into_frames()
+        .progress_count(count)
+        .collect::<Result<Vec<image::Frame>, _>>()?;
+
+    info!("Converting frames info ASCII");
+    // convert frame buffer to ASCII, extract buffer and delay only
+    Ok(frames
+        .into_par_iter()
+        .progress_count(count)
+        .map(|f| frame_to_ascii(f, delay, dims, &config))
+        .collect())
+}
+
 fn get_frames_from_path(
     path: &Path,
     fps: Option<f32>,
     is_colored: bool,
 ) -> Result<Vec<AsciiFrame>> {
     // file reader
-    let input = BufReader::new(File::open(path)?);
+    let mut input = BufReader::new(File::open(path)?);
 
-    // configure the decoder such that it will expand the image to RGBA
-    let decoder = GifDecoder::new(input)?;
+    // determine number of frames
+    let count = get_frames_count(input.by_ref())?;
 
-    // clamp dimensions
-    let (width, height) = decoder.dimensions();
-    let dims = (height > 56).then_some(Dimensions {
-        width: (width as f32 * (56.0 / height as f32)) as u32,
-        height: 56,
-    });
+    // seek back to beginning of file
+    input.seek(SeekFrom::Start(0))?;
 
-    // pass through color determinant
-    let config = ConfigBuilder::new().color(is_colored).build();
+    // convert frames into ASCII
+    let ascii = get_ascii_frames(input, fps, is_colored, count)?;
 
-    // Read the file header
-    let frames = decoder.into_frames().collect_frames()?;
-
-    // determine delay between each frame
-    let delay = fps.map(|value| Duration::from_secs_f32(1.0 / value));
-
-    // convert frame buffer to ASCII, extract buffer and delay only
-    let ascii = frames
-        .into_par_iter()
-        .map(|f| frame_to_ascii(f, delay, dims, &config))
-        .collect::<Vec<AsciiFrame>>();
-
-    if ascii.iter().all(|f| f.delay().is_zero()) {
+    info!("Validating frames");
+    // ensure frame delays are consistent
+    if ascii
+        .par_iter()
+        .progress_count(count)
+        .all(|f| f.delay().is_zero())
+    {
         return Err(GifError::Delay.into());
     }
     Ok(ascii)
 }
 
-pub fn read_file(file_name: &str) -> Result<Vec<AsciiFrame>> {
+fn read_file(file_name: &str) -> Result<Vec<AsciiFrame>> {
     // read contents of file
+    info!("Looking for {:?} file", file_name);
     let src = read(file_name)?;
 
     // decompress contents
+    info!("Decompressing data");
     let decompressed = decode_all(src.as_slice())?;
 
     // deserialize each frame
+    info!("Deserializing data");
     deserialize(&decompressed).map_err(Into::into)
 }
 
@@ -140,15 +179,19 @@ pub fn write_file(
 ) -> Result<Vec<AsciiFrame>> {
     // generate frames
     let frames = if let Some(path) = gif {
+        info!("Converting frames from {:?}", path);
         get_frames_from_path(path, fps, is_colored)?
     } else {
+        info!("Generating donut frames");
         donut::get_frames() // default
     };
     // serialize to bytes
+    info!("Serializing data");
     let src = serialize(&frames.clone())?;
 
     // write to file while compressing serialization
-    let dst = File::create(file_name)?;
+    info!("Writing to file");
+    let dst = BufWriter::new(File::create(file_name)?);
     copy_encode(src.as_slice(), dst, max_c_level())?;
 
     // return the generated frames
@@ -156,16 +199,16 @@ pub fn write_file(
 }
 
 pub fn get_frames(cfg: &Config) -> Result<Vec<AsciiFrame>> {
-    // construct new file name
-    let file_name = cfg.file_name();
+    info!("Retrieving ASCII frames");
 
     // generate and write frames to file if they don't already exist
-    let mut frames = read_file(&file_name).or_else(|_| {
+    let mut frames = read_file(cfg.file_name()).or_else(|_| {
         // save to file, while returning original result
-        write_file(cfg.gif(), cfg.fps(), cfg.is_colored(), &file_name)
+        write_file(cfg.gif(), cfg.fps(), cfg.is_colored(), cfg.file_name())
     })?;
 
     // preprend home ascii escape sequence to each frame buffer
+    info!("Finishing frames");
     for frame in frames.iter_mut() {
         frame.buffer.splice(0..0, "\x1b[H".bytes());
     }

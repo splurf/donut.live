@@ -30,28 +30,10 @@ impl std::fmt::Display for UriError {
     }
 }
 
-pub enum GifError {
-    Delay,
-}
-
-impl std::fmt::Display for GifError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Self::Delay => "GIF (missing frame rate)",
-        })
-    }
-}
-
-impl From<GifError> for Invalid {
-    fn from(value: GifError) -> Self {
-        Self::Gif(value)
-    }
-}
-
 pub enum Invalid {
     Uri(UriError),
-    Gif(GifError),
     Format,
+    Level,
 }
 
 impl std::fmt::Display for Invalid {
@@ -60,8 +42,8 @@ impl std::fmt::Display for Invalid {
             "Invalid {}",
             match self {
                 Self::Uri(e) => e.to_string(),
-                Self::Gif(e) => e.to_string(),
                 Self::Format => "http format".to_string(),
+                Self::Level => "log level".to_string(),
             }
         ))
     }
@@ -79,10 +61,32 @@ impl From<UriError> for Invalid {
     }
 }
 
+impl From<log::ParseLevelError> for Invalid {
+    fn from(_: log::ParseLevelError) -> Self {
+        Invalid::Level
+    }
+}
+
+pub enum GifError {
+    Gif(gif::DecodingError),
+    Image(image::ImageError),
+    Delay,
+}
+
+impl std::fmt::Display for GifError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&match self {
+            Self::Gif(e) => e.to_string(),
+            Self::Image(e) => e.to_string(),
+            Self::Delay => "GIF (missing frame rate)".to_string(),
+        })
+    }
+}
+
 pub enum Error {
     IO(std::io::Error),
     Parse(Invalid),
-    Gif(image::ImageError),
+    Gif(GifError),
     Json(bincode::Error),
     Empty,
     Sync,
@@ -100,8 +104,20 @@ impl<T: Into<Invalid>> From<T> for Error {
     }
 }
 
+impl From<gif::DecodingError> for Error {
+    fn from(value: gif::DecodingError) -> Self {
+        Self::Gif(GifError::Gif(value))
+    }
+}
+
 impl From<image::ImageError> for Error {
     fn from(value: image::ImageError) -> Self {
+        Self::Gif(GifError::Image(value))
+    }
+}
+
+impl From<GifError> for Error {
+    fn from(value: GifError) -> Self {
         Self::Gif(value)
     }
 }
@@ -127,12 +143,6 @@ impl<T> From<std::sync::PoisonError<std::sync::MutexGuard<'_, T>>> for Error {
 impl From<bincode::Error> for Error {
     fn from(value: bincode::Error) -> Self {
         Self::Json(value)
-    }
-}
-
-impl From<Box<dyn std::any::Any + Send>> for Error {
-    fn from(_: Box<dyn std::any::Any + Send>) -> Self {
-        Self::Sync
     }
 }
 

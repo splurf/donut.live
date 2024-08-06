@@ -1,5 +1,5 @@
 use httparse::{Request, EMPTY_HEADER};
-use log::error;
+use log::trace;
 use std::{
     io::Read,
     net::TcpStream,
@@ -57,7 +57,7 @@ pub fn loop_func(mut f: impl FnMut() -> Result<()> + Send + 'static) -> Result<(
     loop {
         // call the function
         if let Err(e) = f() {
-            error!("{}", e)
+            trace!("{}", e)
         }
     }
 }

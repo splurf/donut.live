@@ -71,6 +71,7 @@ pub enum GifError {
     Gif(gif::DecodingError),
     Image(image::ImageError),
     Delay,
+    Eof,
 }
 
 impl std::fmt::Display for GifError {
@@ -79,6 +80,7 @@ impl std::fmt::Display for GifError {
             Self::Gif(e) => e.to_string(),
             Self::Image(e) => e.to_string(),
             Self::Delay => "GIF (missing frame rate)".to_string(),
+            Self::Eof => "EOF".to_string(),
         })
     }
 }
@@ -88,6 +90,7 @@ pub enum Error {
     Parse(Invalid),
     Gif(GifError),
     Json(bincode::Error),
+    Cli(indicatif::style::TemplateError),
     Empty,
     Sync,
 }
@@ -122,6 +125,18 @@ impl From<GifError> for Error {
     }
 }
 
+impl From<bincode::Error> for Error {
+    fn from(value: bincode::Error) -> Self {
+        Self::Json(value)
+    }
+}
+
+impl From<indicatif::style::TemplateError> for Error {
+    fn from(value: indicatif::style::TemplateError) -> Self {
+        Self::Cli(value)
+    }
+}
+
 impl<T> From<std::sync::PoisonError<std::sync::RwLockReadGuard<'_, T>>> for Error {
     fn from(_: std::sync::PoisonError<std::sync::RwLockReadGuard<'_, T>>) -> Self {
         Self::Sync
@@ -140,12 +155,6 @@ impl<T> From<std::sync::PoisonError<std::sync::MutexGuard<'_, T>>> for Error {
     }
 }
 
-impl From<bincode::Error> for Error {
-    fn from(value: bincode::Error) -> Self {
-        Self::Json(value)
-    }
-}
-
 impl std::fmt::Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self, f)
@@ -159,8 +168,9 @@ impl std::fmt::Display for Error {
             Self::Parse(e) => e.to_string(),
             Self::Gif(e) => e.to_string(),
             Self::Json(e) => e.to_string(),
+            Self::Cli(e) => e.to_string(),
             Self::Empty => "The server is empty. Entering idle mode.".to_string(),
-            Self::Sync => "An unexpected poison error has occurred".to_string(),
+            Self::Sync => "An unexpected (poison or thread) error has occurred".to_string(),
         })
     }
 }

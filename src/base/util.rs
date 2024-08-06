@@ -1,4 +1,5 @@
 use httparse::{Request, EMPTY_HEADER};
+use log::error;
 use std::{
     io::Read,
     net::TcpStream,
@@ -48,7 +49,7 @@ pub fn verify_stream(mut stream: &TcpStream, uri_path: &str) -> Result<()> {
 
 /// Spawn a new thread that repeatedly calls the provided function.
 pub fn init_handler(f: impl FnMut() -> Result<()> + Send + 'static) -> JoinHandle<Result<()>> {
-    spawn(move || -> Result<()> { loop_func(f) })
+    spawn(move || loop_func(f))
 }
 
 /// Continuously call the provided function while emitting errors.
@@ -56,7 +57,7 @@ pub fn loop_func(mut f: impl FnMut() -> Result<()> + Send + 'static) -> Result<(
     loop {
         // call the function
         if let Err(e) = f() {
-            eprintln!("{}", e)
+            error!("{}", e)
         }
     }
 }

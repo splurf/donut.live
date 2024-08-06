@@ -2,12 +2,16 @@ mod ascii;
 mod cfg;
 mod donut;
 mod err;
+mod frame;
+mod progress;
 mod sync;
 mod util;
 
 pub use ascii::*;
 pub use cfg::*;
 pub use err::*;
+pub use frame::*;
+pub use progress::*;
 pub use sync::*;
 pub use util::*;
 
@@ -28,12 +32,12 @@ pub fn error_handler(
 ) -> JoinHandle<Result<()>> {
     init_handler(move || {
         // wait for a connection to be lost
-        disconnected.wait()?;
+        disconnected.wait();
 
         {
             // acquire and hold onto the write guards
-            let mut gw_disconnected = disconnected.write()?;
-            let mut gw_streams = streams.write()?;
+            let mut gw_disconnected = disconnected.write();
+            let mut gw_streams = streams.write();
 
             // remove every disconnected stream
             while let Some(ip) = gw_disconnected.pop() {
@@ -42,11 +46,11 @@ pub fn error_handler(
         }
         // update the predicate of `streams` so the main thread
         // knows when to pause due to there being no connections
-        let is_empty = streams.read()?.is_empty();
-        *streams.lock()? = !is_empty;
+        let is_empty = streams.read().is_empty();
+        *streams.lock() = !is_empty;
 
         // reset the boolean predicate
-        *disconnected.lock()? = false;
+        *disconnected.lock() = false;
         Ok(())
     })
 }
@@ -70,10 +74,10 @@ pub fn incoming_handler(
         stream.write_all(INIT)?;
 
         // add the stream to the map
-        streams.write()?.insert(addr, stream);
+        streams.write().insert(addr, stream);
 
         // notify `streams` of a new connection
-        *streams.lock()? = true;
+        *streams.lock() = true;
         streams.notify();
         Ok(())
     })
@@ -87,7 +91,7 @@ pub fn _dist_handler(
 ) -> Result<()> {
     // discontinue distributing frames and pause
     // this thread if there are no connections
-    if !*streams.lock()? {
+    if !*streams.lock() {
         return Err(Error::Empty);
     }
 
@@ -97,10 +101,10 @@ pub fn _dist_handler(
         // This doesn't cause a deadlock because `disconnected` is
         // only ever externally accessed after the end of this scope,
         // which is covered as this guard gets automatically dropped
-        let mut g = disconnected.write()?;
+        let mut g = disconnected.write();
 
         // send each stream the current frame
-        for (ip, mut stream) in streams.read()?.iter() {
+        for (ip, mut stream) in streams.read().iter() {
             // remove the client if they have disconnected
             if stream.write_all(frame.as_ref()).is_err() {
                 g.push(*ip);
@@ -112,7 +116,7 @@ pub fn _dist_handler(
 
     // notify `disconnected` due to a disconnection
     if res {
-        *disconnected.lock()? = true;
+        *disconnected.lock() = true;
         disconnected.notify();
     }
     Ok(())
@@ -126,7 +130,7 @@ pub fn dist_handler(
     frame_index: &mut usize,
 ) -> Result<()> {
     // wait until there's at least one connection
-    streams.wait()?;
+    streams.wait();
 
     // distribute the frames to each client
     for (i, frame) in frames.iter().enumerate().skip(*frame_index) {

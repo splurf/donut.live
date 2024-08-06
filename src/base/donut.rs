@@ -1,6 +1,8 @@
 use std::{f32::consts::TAU, time::Duration};
 
-use super::AsciiFrame;
+use indicatif::ProgressBar;
+
+use super::{style, AsciiFrame};
 
 /// The delay between each frame
 /// - 20.833333ms => ~48 FPS
@@ -74,8 +76,18 @@ pub fn get_frames() -> Vec<AsciiFrame> {
     let mut p = [32; 1760];
 
     // Generate the original `donut` frames (559234 bytes)
-    let mut frames = [0; 314].map(|_| gen_frame(&mut a, &mut b, &mut i, &mut j, &mut z, &mut p));
+    let pb = style(314, "Generating frames", false);
+    let mut frames = [0; 314].map(|_| {
+        let frame = gen_frame(&mut a, &mut b, &mut i, &mut j, &mut z, &mut p);
+        pb.inc(1);
+        frame
+    });
+    pb.finish();
+
+    let pb = ProgressBar::new_spinner().with_message("Trimming frames");
     trim_frames(&mut frames); // 395012 bytes (~29% smaller)
+    pb.finish_and_clear();
+
     frames.map(|buffer| AsciiFrame::new(buffer, DELAY)).to_vec()
 }
 

@@ -13,7 +13,7 @@ use std::{
     path::Path,
     sync::Arc,
     thread::spawn,
-    time::{Duration, Instant},
+    time::Duration,
 };
 use zstd::{decode_all, zstd_safe::max_c_level};
 
@@ -113,11 +113,8 @@ fn get_frames_from_path(
 
     let opt = DecodeOptions::new();
 
-    let t = Instant::now();
-
     // determine number of frames
     let count = get_frames_count(opt.clone(), input.by_ref())?;
-    info!("ELAPSED: {:?}", t.elapsed());
     info!("Number of frames: {}", count);
 
     // seek back to beginning of file

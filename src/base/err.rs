@@ -1,20 +1,59 @@
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
+pub enum AddrError {
+    Parse(std::net::AddrParseError),
+    Unexpected(std::string::FromUtf8Error),
+}
+
+impl From<std::net::AddrParseError> for AddrError {
+    fn from(value: std::net::AddrParseError) -> Self {
+        Self::Parse(value)
+    }
+}
+
+impl From<std::string::FromUtf8Error> for AddrError {
+    fn from(value: std::string::FromUtf8Error) -> Self {
+        Self::Unexpected(value)
+    }
+}
+
+impl std::fmt::Display for AddrError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&match self {
+            Self::Parse(e) => e.to_string(),
+            Self::Unexpected(e) => e.to_string(),
+        })
+    }
+}
+
 pub enum UriError {
     HttpParse(httparse::Error),
     Method(String),
     Path(String),
     Version(u8),
     Header(String),
+    Addr(AddrError),
 }
 
-impl<'a> From<&mut httparse::Header<'a>> for UriError {
-    fn from(value: &mut httparse::Header<'a>) -> Self {
+impl<'a> From<&httparse::Header<'a>> for UriError {
+    fn from(value: &httparse::Header<'a>) -> Self {
         Self::Header(format!(
             "{{ {}: {} }}",
             value.name,
             String::from_utf8_lossy(value.value)
         ))
+    }
+}
+
+impl From<httparse::Error> for UriError {
+    fn from(value: httparse::Error) -> Self {
+        Self::HttpParse(value)
+    }
+}
+
+impl<T: Into<AddrError>> From<T> for UriError {
+    fn from(value: T) -> Self {
+        Self::Addr(value.into())
     }
 }
 
@@ -26,6 +65,7 @@ impl std::fmt::Display for UriError {
             Self::Path(s) => format!("path {}", s),
             Self::Version(v) => format!("version {}", v),
             Self::Header(s) => format!("header {}", s),
+            Self::Addr(e) => format!("address => {}", e),
         })
     }
 }
@@ -34,6 +74,18 @@ pub enum Invalid {
     Uri(UriError),
     Format,
     Level,
+}
+
+impl<T: Into<UriError>> From<T> for Invalid {
+    fn from(value: T) -> Self {
+        Self::Uri(value.into())
+    }
+}
+
+impl From<log::ParseLevelError> for Invalid {
+    fn from(_: log::ParseLevelError) -> Self {
+        Invalid::Level
+    }
 }
 
 impl std::fmt::Display for Invalid {
@@ -46,24 +98,6 @@ impl std::fmt::Display for Invalid {
                 Self::Level => "log level".to_string(),
             }
         ))
-    }
-}
-
-impl From<httparse::Error> for Invalid {
-    fn from(value: httparse::Error) -> Self {
-        UriError::HttpParse(value).into()
-    }
-}
-
-impl From<UriError> for Invalid {
-    fn from(value: UriError) -> Self {
-        Self::Uri(value)
-    }
-}
-
-impl From<log::ParseLevelError> for Invalid {
-    fn from(_: log::ParseLevelError) -> Self {
-        Invalid::Level
     }
 }
 

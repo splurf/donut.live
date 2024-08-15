@@ -1,5 +1,6 @@
 mod ascii;
 mod cfg;
+mod client;
 mod donut;
 mod err;
 mod frame;
@@ -9,6 +10,7 @@ mod util;
 
 pub use ascii::*;
 pub use cfg::*;
+pub use client::*;
 pub use err::*;
 pub use frame::*;
 pub use progress::*;
@@ -16,9 +18,8 @@ pub use sync::*;
 pub use util::*;
 
 use std::{
-    collections::HashMap,
     io::Write,
-    net::{SocketAddr, TcpListener, TcpStream},
+    net::{SocketAddr, TcpListener},
     thread::{sleep, JoinHandle},
 };
 
@@ -27,7 +28,7 @@ const INIT: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8
 
 /// Automatically remove any disconnected clients.
 pub fn error_handler(
-    streams: CondLock<HashMap<SocketAddr, TcpStream>>,
+    streams: CondLock<Clients>,
     disconnected: CondLock<Vec<SocketAddr>>,
 ) -> JoinHandle<Result<()>> {
     init_handler(move || {
@@ -40,9 +41,9 @@ pub fn error_handler(
             let mut gw_streams = streams.write();
 
             // remove every disconnected stream
-            while let Some(ip) = gw_disconnected.pop() {
-                gw_streams.remove(&ip);
-            }
+            gw_disconnected.drain(..).for_each(|addr| {
+                gw_streams.remove(&addr);
+            });
         }
         // update the predicate of `streams` so the main thread
         // knows when to pause due to there being no connections
@@ -58,23 +59,23 @@ pub fn error_handler(
 /// Validate and instantiate streams into the system.
 pub fn incoming_handler(
     server: TcpListener,
-    streams: CondLock<HashMap<SocketAddr, TcpStream>>,
+    streams: CondLock<Clients>,
     path: &str,
 ) -> JoinHandle<Result<()>> {
     let path = path.to_owned();
 
     init_handler(move || {
         // handle any potential stream waiting to be accepted by the server
-        let (mut stream, addr) = server.accept()?;
+        let (mut stream, ..) = server.accept()?;
 
         // determine the authenticity of the stream
-        verify_stream(&stream, &path)?;
+        let addr = verify_stream(&stream, &path)?;
 
         // setup the client's terminal
         stream.write_all(INIT)?;
 
         // add the stream to the map
-        streams.write().insert(addr, stream);
+        streams.write().insert(addr, Client::new(stream, addr));
 
         // notify `streams` of a new connection
         *streams.lock() = true;
@@ -85,7 +86,7 @@ pub fn incoming_handler(
 
 /// Distribute each frame to every stream.
 pub fn _dist_handler(
-    streams: &CondLock<HashMap<SocketAddr, TcpStream>>,
+    streams: &CondLock<Clients>,
     disconnected: &CondLock<Vec<SocketAddr>>,
     frame: &AsciiFrame,
 ) -> Result<()> {
@@ -104,10 +105,10 @@ pub fn _dist_handler(
         let mut g = disconnected.write();
 
         // send each stream the current frame
-        for (ip, mut stream) in streams.read().iter() {
+        for mut client in streams.read().values() {
             // remove the client if they have disconnected
-            if stream.write_all(frame.as_ref()).is_err() {
-                g.push(*ip);
+            if client.write_all(frame.as_ref()).is_err() {
+                g.push(client.addr())
             }
         }
         // determinant for whether there have been any disconnections
@@ -124,7 +125,7 @@ pub fn _dist_handler(
 
 /// Distribute each frame to every stream.
 pub fn dist_handler(
-    streams: &CondLock<HashMap<SocketAddr, TcpStream>>,
+    streams: &CondLock<Clients>,
     disconnected: &CondLock<Vec<SocketAddr>>,
     frames: &[AsciiFrame],
     frame_index: &mut usize,

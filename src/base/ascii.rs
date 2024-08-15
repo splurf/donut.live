@@ -3,7 +3,7 @@ use bincode::{deserialize_from, serialize};
 use gif::DecodeOptions;
 use image::{codecs::gif::GifDecoder, AnimationDecoder, ImageDecoder};
 use indicatif::{MultiProgress, ParallelProgressIterator, ProgressIterator};
-use log::info;
+use log::trace;
 use parking_lot::RwLock;
 use rayon::iter::{IntoParallelRefMutIterator, ParallelIterator};
 use std::{
@@ -115,7 +115,7 @@ fn get_frames_from_path(
 
     // determine number of frames
     let count = get_frames_count(opt.clone(), input.by_ref())?;
-    info!("Number of frames: {}", count);
+    trace!("Number of frames: {}", count);
 
     // seek back to beginning of file
     input.seek(SeekFrom::Start(0))?;
@@ -126,7 +126,7 @@ fn get_frames_from_path(
 
 fn read_file(file_name: &str) -> Result<Vec<AsciiFrame>> {
     // read contents of file
-    info!("Looking for {:?} file", file_name);
+    trace!("Looking for {:?} file", file_name);
     let input = read(file_name)?;
 
     // decompress file contents
@@ -147,14 +147,14 @@ pub fn write_file(
 ) -> Result<Vec<AsciiFrame>> {
     // generate frames
     let frames = if let Some(path) = gif {
-        info!("Converting frames from {:?}", path);
+        trace!("Converting frames from {:?}", path);
         get_frames_from_path(path, fps, is_colored)?
     } else {
         donut::get_frames() // default
     };
 
     // serialize to bytes
-    info!("Serializing data");
+    trace!("Serializing data");
     let serialized = serialize(frames.as_slice())?;
 
     // write to file while compressing serialization

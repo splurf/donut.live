@@ -87,8 +87,8 @@ impl Config {
     pub fn new() -> Result<Self> {
         let init = InitConfig::parse();
 
-        // ensure valid log level (default: 'info')
-        let log_level = Level::from_str(&var("RUST_LOG").unwrap_or_else(|_| "info".to_string()))?;
+        // ensure valid log level (default: 'trace')
+        let log_level = Level::from_str(&var("RUST_LOG").unwrap_or_else(|_| "trace".to_string()))?;
 
         // ensure intended log level
         set_var("RUST_LOG", format!("{},artem=warn", log_level));

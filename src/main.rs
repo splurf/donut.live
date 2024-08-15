@@ -1,7 +1,8 @@
 mod base;
 
-use log::info;
 use std::net::TcpListener;
+
+use log::trace;
 
 use base::*;
 
@@ -13,7 +14,7 @@ fn main() -> Result<()> {
     let frames = get_frames(&cfg)?;
 
     // init listener
-    info!("Initializing TCP server");
+    trace!("Initializing TCP server");
     let server = TcpListener::bind(cfg.addr())?;
 
     // connected clients
@@ -26,7 +27,7 @@ fn main() -> Result<()> {
     error_handler(streams.clone(), disconnected.clone());
     incoming_handler(server, streams.clone(), cfg.path());
 
-    info!("Listening @ http://{}{}\n", cfg.addr(), cfg.path());
+    trace!("Listening @ http://{}{}\n", cfg.addr(), cfg.path());
 
     // global frame index
     let mut frame_index = 0;

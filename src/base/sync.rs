@@ -8,13 +8,6 @@ pub struct CondLock<T> {
 }
 
 impl<T> CondLock<T> {
-    /// Instantiate with provided value
-    pub fn new(value: T) -> Self {
-        Self {
-            inner: Arc::new((RwLock::new(value), Mutex::default(), Condvar::default())),
-        }
-    }
-
     /// Acquires the mutex for the boolean predicate
     pub fn lock(&self) -> MutexGuard<bool> {
         self.inner.1.lock()

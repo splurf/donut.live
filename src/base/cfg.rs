@@ -2,7 +2,7 @@ use clap::Parser;
 use log::Level;
 use std::{
     env::{set_var, var},
-    net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     ops::Deref,
     path::{Path, PathBuf},
     str::FromStr,
@@ -39,21 +39,22 @@ pub struct InitConfig {
     gif: Option<PathBuf>,
 
     /// Custom Frames/sec
-    #[arg(short, long)]
+    #[arg(long)]
     fps: Option<f32>,
 
     /// Enable/Disable color
     #[arg(short, long)]
     colored: bool,
+
+    /// Ensure 'COLORTERM' and 'CLICOLOR_FORCE' are set
+    #[arg(short, long)]
+    force_colored: bool,
 }
 
 impl InitConfig {
     /// Construct a [`SocketAddr`] from the `addr` and `port` attributes
     pub const fn addr(&self) -> SocketAddr {
-        match self.addr {
-            IpAddr::V4(ip) => SocketAddr::V4(SocketAddrV4::new(ip, self.port)),
-            IpAddr::V6(ip) => SocketAddr::V6(SocketAddrV6::new(ip, self.port, 0, 1)),
-        }
+        SocketAddr::new(self.addr, self.port)
     }
 
     /// URI path
@@ -73,25 +74,31 @@ impl InitConfig {
 
     /// Determinant for whether the gif will be is_colored or not.
     pub const fn is_colored(&self) -> bool {
-        self.colored
+        self.colored || self.force_colored
     }
 }
 
 pub struct Config {
     init: InitConfig,
     file_name: String,
-    log_level: Level,
 }
 
 impl Config {
     pub fn new() -> Result<Self> {
-        let init = InitConfig::parse();
-
         // ensure valid log level (default: 'trace')
         let log_level = Level::from_str(&var("RUST_LOG").unwrap_or_else(|_| "trace".to_string()))?;
 
+        // have 'clap' parse the program arguments
+        let init = InitConfig::parse();
+
         // ensure intended log level
         set_var("RUST_LOG", format!("{},artem=warn", log_level));
+
+        // set color specifiers
+        if init.force_colored {
+            set_var("COLORTERM", "truecolor");
+            set_var("CLICOLOR_FORCE", "1");
+        }
 
         // the new file stem of the ascii-generated file
         let file_stem = init
@@ -118,19 +125,11 @@ impl Config {
         // init logger
         env_logger::init();
 
-        Ok(Self {
-            init,
-            file_name,
-            log_level,
-        })
+        Ok(Self { init, file_name })
     }
 
     pub fn file_name(&self) -> &str {
         &self.file_name
-    }
-
-    pub const fn log_level(&self) -> Level {
-        self.log_level
     }
 }
 

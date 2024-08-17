@@ -20,14 +20,15 @@ HTTP server that distributes frames of a rotating donut to every [curl](https://
 Usage: donut-live [OPTIONS]
 
 Options:
-  -a, --addr <ADDR>  IP address [default: 127.0.0.1]
-  -p, --port <PORT>  Port number [default: 8080]    
-      --path <PATH>  URI location path [default: /] 
-  -g, --gif <GIF>    Custom provided GIF
-  -f, --fps <FPS>    Custom Frames/sec
-  -c, --colored      Enable/Disable color
-  -h, --help         Print help
-  -V, --version      Print version
+  -a, --addr <ADDR>    IP address [default: 127.0.0.1]
+  -p, --port <PORT>    Port number [default: 8080]
+      --path <PATH>    URI location path [default: /]
+  -g, --gif <GIF>      Custom provided GIF
+      --fps <FPS>      Custom Frames/sec
+  -c, --colored        Enable/Disable color
+  -f, --force-colored  Ensure 'COLORTERM' and 'CLICOLOR_FORCE' are set
+  -h, --help           Print help
+  -V, --version        Print version
 ```
 
 ## Other Live Demos

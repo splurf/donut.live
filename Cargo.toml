@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 artem = "3.0.0"
 bincode = "1.3.3"
+chrono = { version = "0.4.38", default-features = false, features = ["clock"], optional = true }
 clap = { version = "4.5.16", features = ["derive"] }
 env_logger = "0.11.5"
 gif = "0.13.1"
@@ -18,6 +19,9 @@ rayon = "1.10.0"
 serde = { version = "1.0.208", features = ["derive"] }
 serde_bytes = "0.11.15"
 zstd = "0.13.2"
+
+[features]
+logger = ["chrono"]
 
 [profile.release]
 lto = true

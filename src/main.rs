@@ -1,14 +1,17 @@
 mod base;
 
-use std::net::TcpListener;
-
 use log::trace;
+use std::net::TcpListener;
 
 use base::*;
 
-fn main() -> Result<()> {
+fn main() -> Result {
     // parse program arguments
     let cfg = Config::new()?;
+
+    // create log file if it does not already exist
+    #[cfg(feature = "logger")]
+    init_log_file();
 
     // retrieve ascii frames
     let frames = get_frames(&cfg)?;
@@ -18,14 +21,14 @@ fn main() -> Result<()> {
     let server = TcpListener::bind(cfg.addr())?;
 
     // connected clients
-    let streams = CondLock::default();
+    let streams = SignalLock::default();
 
     // disconnected clients
-    let disconnected = CondLock::default();
+    let disconnected = SignalLock::default();
 
     // init handlers
     error_handler(streams.clone(), disconnected.clone());
-    incoming_handler(server, streams.clone(), cfg.path());
+    incoming_handler(server, streams.clone(), cfg.path().to_owned());
 
     trace!("Listening @ http://{}{}\n", cfg.addr(), cfg.path());
 

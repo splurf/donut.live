@@ -1,6 +1,5 @@
-use std::{f32::consts::TAU, time::Duration};
-
 use indicatif::ProgressBar;
+use std::{f32::consts::TAU, time::Duration};
 
 use super::{style, AsciiFrame};
 

@@ -3,11 +3,11 @@ use std::sync::Arc;
 
 /// A concurrency-safe wrapper, conveniently bundled with its respective condition variable
 #[derive(Default)]
-pub struct CondLock<T> {
+pub struct SignalLock<T> {
     inner: Arc<(RwLock<T>, Mutex<bool>, Condvar)>,
 }
 
-impl<T> CondLock<T> {
+impl<T> SignalLock<T> {
     /// Acquires the mutex for the boolean predicate
     pub fn lock(&self) -> MutexGuard<bool> {
         self.inner.1.lock()
@@ -26,7 +26,7 @@ impl<T> CondLock<T> {
     }
 }
 
-impl<T> Clone for CondLock<T> {
+impl<T> Clone for SignalLock<T> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -34,7 +34,7 @@ impl<T> Clone for CondLock<T> {
     }
 }
 
-impl<T> std::ops::Deref for CondLock<T> {
+impl<T> std::ops::Deref for SignalLock<T> {
     type Target = RwLock<T>;
 
     fn deref(&self) -> &Self::Target {

@@ -17,6 +17,12 @@ pub use progress::*;
 pub use sync::*;
 pub use util::*;
 
+#[cfg(feature = "logger")]
+mod logger;
+
+#[cfg(feature = "logger")]
+pub use logger::*;
+
 use std::{
     io::Write,
     net::{SocketAddr, TcpListener},
@@ -28,9 +34,9 @@ const INIT: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8
 
 /// Automatically remove any disconnected clients.
 pub fn error_handler(
-    streams: CondLock<Clients>,
-    disconnected: CondLock<Vec<SocketAddr>>,
-) -> JoinHandle<Result<()>> {
+    streams: SignalLock<Clients>,
+    disconnected: SignalLock<Vec<SocketAddr>>,
+) -> JoinHandle<Result> {
     init_handler(move || {
         // wait for a connection to be lost
         disconnected.wait();
@@ -59,11 +65,9 @@ pub fn error_handler(
 /// Validate and instantiate streams into the system.
 pub fn incoming_handler(
     server: TcpListener,
-    streams: CondLock<Clients>,
-    path: &str,
-) -> JoinHandle<Result<()>> {
-    let path = path.to_owned();
-
+    streams: SignalLock<Clients>,
+    path: String,
+) -> JoinHandle<Result> {
     init_handler(move || {
         // handle any potential stream waiting to be accepted by the server
         let (mut stream, ..) = server.accept()?;
@@ -80,16 +84,20 @@ pub fn incoming_handler(
         // notify `streams` of a new connection
         *streams.lock() = true;
         streams.notify();
+
+        #[cfg(feature = "logger")]
+        log_to_file(addr)?;
+
         Ok(())
     })
 }
 
 /// Distribute each frame to every stream.
 pub fn _dist_handler(
-    streams: &CondLock<Clients>,
-    disconnected: &CondLock<Vec<SocketAddr>>,
+    streams: &SignalLock<Clients>,
+    disconnected: &SignalLock<Vec<SocketAddr>>,
     frame: &AsciiFrame,
-) -> Result<()> {
+) -> Result {
     // discontinue distributing frames and pause
     // this thread if there are no connections
     if !*streams.lock() {
@@ -125,11 +133,11 @@ pub fn _dist_handler(
 
 /// Distribute each frame to every stream.
 pub fn dist_handler(
-    streams: &CondLock<Clients>,
-    disconnected: &CondLock<Vec<SocketAddr>>,
+    streams: &SignalLock<Clients>,
+    disconnected: &SignalLock<Vec<SocketAddr>>,
     frames: &[AsciiFrame],
     frame_index: &mut usize,
-) -> Result<()> {
+) -> Result {
     // wait until there's at least one connection
     streams.wait();
 

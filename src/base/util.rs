@@ -55,12 +55,12 @@ pub fn verify_stream(mut stream: &TcpStream, uri_path: &str) -> Result<SocketAdd
 }
 
 /// Spawn a new thread that repeatedly calls the provided function.
-pub fn init_handler(f: impl FnMut() -> Result<()> + Send + 'static) -> JoinHandle<Result<()>> {
+pub fn init_handler(f: impl FnMut() -> Result + Send + 'static) -> JoinHandle<Result> {
     spawn(move || loop_func(f))
 }
 
 /// Continuously call the provided function while emitting errors.
-pub fn loop_func(mut f: impl FnMut() -> Result<()> + Send + 'static) -> Result<()> {
+pub fn loop_func(mut f: impl FnMut() -> Result + Send + 'static) -> Result {
     loop {
         // call the function
         if let Err(e) = f() {

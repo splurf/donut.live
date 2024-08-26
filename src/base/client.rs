@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    net::{SocketAddr, TcpStream},
-};
-
-pub type Clients = HashMap<SocketAddr, Client>;
+use std::net::{SocketAddr, TcpStream};
 
 #[derive(Debug)]
 pub struct Client {

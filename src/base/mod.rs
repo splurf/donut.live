@@ -13,6 +13,7 @@ pub use cfg::*;
 pub use client::*;
 pub use err::*;
 pub use frame::*;
+use onebuck::{Bucket, ValueIndex};
 pub use progress::*;
 pub use sync::*;
 pub use util::*;
@@ -25,7 +26,7 @@ pub use logger::*;
 
 use std::{
     io::Write,
-    net::{SocketAddr, TcpListener},
+    net::TcpListener,
     thread::{sleep, JoinHandle},
 };
 
@@ -34,8 +35,8 @@ const INIT: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8
 
 /// Automatically remove any disconnected clients.
 pub fn error_handler(
-    streams: SignalLock<Clients>,
-    disconnected: SignalLock<Vec<SocketAddr>>,
+    streams: SignalLock<Bucket<Client>>,
+    disconnected: SignalLock<Vec<ValueIndex>>,
 ) -> JoinHandle<Result> {
     init_handler(move || {
         // wait for a connection to be lost
@@ -47,8 +48,8 @@ pub fn error_handler(
             let mut gw_streams = streams.write();
 
             // remove every disconnected stream
-            gw_disconnected.drain(..).for_each(|addr| {
-                gw_streams.remove(&addr);
+            gw_disconnected.drain(..).for_each(|i| {
+                gw_streams.remove(i);
             });
         }
         // update the predicate of `streams` so the main thread
@@ -65,7 +66,7 @@ pub fn error_handler(
 /// Validate and instantiate streams into the system.
 pub fn incoming_handler(
     server: TcpListener,
-    streams: SignalLock<Clients>,
+    streams: SignalLock<Bucket<Client>>,
     path: String,
 ) -> JoinHandle<Result> {
     init_handler(move || {
@@ -79,7 +80,7 @@ pub fn incoming_handler(
         stream.write_all(INIT)?;
 
         // add the stream to the map
-        streams.write().insert(addr, Client::new(stream, addr));
+        streams.write().insert(Client::new(stream, addr));
 
         // notify `streams` of a new connection
         *streams.lock() = true;
@@ -94,8 +95,8 @@ pub fn incoming_handler(
 
 /// Distribute each frame to every stream.
 pub fn _dist_handler(
-    streams: &SignalLock<Clients>,
-    disconnected: &SignalLock<Vec<SocketAddr>>,
+    streams: &SignalLock<Bucket<Client>>,
+    disconnected: &SignalLock<Vec<ValueIndex>>,
     frame: &AsciiFrame,
 ) -> Result {
     // discontinue distributing frames and pause
@@ -106,17 +107,17 @@ pub fn _dist_handler(
 
     // the number of disconnections
     let res = {
-        // acquire the writing guard of `disconnected`.
-        // This doesn't cause a deadlock because `disconnected` is
-        // only ever externally accessed after the end of this scope,
-        // which is covered as this guard gets automatically dropped
+        // // acquire the writing guard of `disconnected`.
+        // // This doesn't cause a deadlock because `disconnected` is
+        // // only ever externally accessed after the end of this scope,
+        // // which is covered as this guard gets automatically dropped
         let mut g = disconnected.write();
 
         // send each stream the current frame
-        for mut client in streams.read().values() {
+        for mut client in streams.read().iter() {
             // remove the client if they have disconnected
             if client.write_all(frame.as_ref()).is_err() {
-                g.push(client.addr())
+                g.push(client.into())
             }
         }
         // determinant for whether there have been any disconnections
@@ -133,8 +134,8 @@ pub fn _dist_handler(
 
 /// Distribute each frame to every stream.
 pub fn dist_handler(
-    streams: &SignalLock<Clients>,
-    disconnected: &SignalLock<Vec<SocketAddr>>,
+    streams: &SignalLock<Bucket<Client>>,
+    disconnected: &SignalLock<Vec<ValueIndex>>,
     frames: &[AsciiFrame],
     frame_index: &mut usize,
 ) -> Result {

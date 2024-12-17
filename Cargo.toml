@@ -6,15 +6,15 @@ edition = "2021"
 [dependencies]
 artem = "3.0.0"
 bincode = "1.3.3"
-chrono = { version = "0.4.38", default-features = false, features = [
+chrono = { version = "0.4.39", default-features = false, features = [
     "clock",
 ], optional = true }
-clap = { version = "4.5.16", features = ["derive"] }
+clap = { version = "4.5.23", features = ["derive"] }
 env_logger = "0.11.5"
 gif = "0.13.1"
-httparse = "1.9.4"
-image = "0.25.2"
-indicatif = { version = "0.17.8", features = ["rayon"] }
+httparse = "1.9.5"
+image = "0.25.5"
+indicatif = { version = "0.17.9", features = ["rayon"] }
 log = "0.4.22"
 onebuck = { version = "0.1.5", default-features = false, features = [
     "atomic",
@@ -22,11 +22,12 @@ onebuck = { version = "0.1.5", default-features = false, features = [
 ] }
 parking_lot = "0.12.3"
 rayon = "1.10.0"
-serde = { version = "1.0.209", features = ["derive"] }
+serde = { version = "1.0.216", features = ["derive"] }
 serde_bytes = "0.11.15"
 zstd = "0.13.2"
 
 [features]
+default = []
 logger = ["chrono"]
 
 [profile.release]
